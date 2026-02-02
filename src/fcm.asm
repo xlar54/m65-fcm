@@ -45,7 +45,7 @@ _fcm_set40:
         ; 40-column mode: clear H640 (bit 7)
         lda VIC3_CTRL
         and #%01111111  ; clear H640 - 40 col
-        ora #%00100000  ; set ATTR 
+        ;ora #%00100000  ; set ATTR 
         sta VIC3_CTRL
 
         ; LINESTEP (40 chars × 2 bytes per screen code)
@@ -53,6 +53,9 @@ _fcm_set40:
         sta VIC4_LINESTPLSB
         lda #0
         sta VIC4_LINESTPMSB
+
+        lda #40
+        sta $D05E               ; ADD THIS: CHRCOUNT = 40 chars per row
 
         jmp _fcm_vic4_mode_set
 
@@ -67,6 +70,9 @@ _fcm_set80:
         sta VIC4_LINESTPLSB
         lda #0
         sta VIC4_LINESTPMSB
+
+        lda #80
+        sta $D05E               ; ADD THIS: CHRCOUNT = 80 chars per row
 
 _fcm_vic4_mode_set:
         ; -------- all above must be done before setting screen address
@@ -99,16 +105,33 @@ _fcm_vic4_mode_set:
 
         jsr load_chars
 
+                ; Always start from the original text position (pre-FCM)
+        lda orig_textxpos
+        sta VIC4_TEXTXPOS
+        lda orig_textypos
+        sta VIC4_TEXTYPOS
+
         lda screen_mode
         cmp #40
         bne _fcm_done
-        ; bump the X text position to the left by 3
-        dec VIC4_TEXTXPOS
-        dec VIC4_TEXTXPOS
-        dec VIC4_TEXTXPOS
 
-        ; increase the Y text position by 1
-        inc VIC4_TEXTYPOS
+        ; For 40-col: X = orig - 3 (clamped at 0), Y = orig + 1
+        lda orig_textxpos
+        cmp #3
+        bcc _xpos_zero
+        sec
+        sbc #3
+        bra _xpos_set
+_xpos_zero:
+        lda #0
+_xpos_set:
+        sta VIC4_TEXTXPOS
+
+        lda orig_textypos
+        clc
+        adc #1
+        sta VIC4_TEXTYPOS
+
 
 _fcm_done:
         rts
@@ -121,9 +144,9 @@ orig_textypos   .byte $00
 fcm_initialized .byte 0 
 
 ;=======================================================================================
-; exit_fcm - Restore normal screen mode and return to BASIC
+; exit_fcm - Restore normal screen mode
 ;=======================================================================================
-exit_fcm:
+fcm_exit:
         ; Disable FCM/SEAM - clear CHR16, FCLRLO, FCLRHI
         lda orig_d054
         sta VIC4_CTRL

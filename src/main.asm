@@ -52,7 +52,7 @@ screen_mode:
 ; main entry
 ;=======================================================================================
 main:
-        lda #40
+        lda #80
         sta screen_mode
         jsr fcm_init
 
@@ -102,16 +102,14 @@ _not_zero:
         bne _loop
 
         jsr demo_bitmap40
-        jsr exit_fcm
         jsr demo_bitmap80
-        jsr exit_fcm
         rts
 
 _color_val:
         .byte $01
 
 _msg:
-        .text "fcm demo"
+        .text "FCM DEMO"
         .byte 0                 ; null terminator
 
 .include "fcm.asm"
@@ -236,6 +234,7 @@ _loop:
         cmp #' '
         bne _loop
 
+        jsr fcm_exit
         rts
 
 
@@ -356,5 +355,7 @@ _loop:
         jsr $FFE4
         cmp #' '
         bne _loop
+
+        jsr fcm_exit
 
         rts
