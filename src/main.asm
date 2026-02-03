@@ -21,11 +21,19 @@ VIC4_COLPTRLSB          = $D064
 VIC4_COLPTRMSB          = $D065
 VIC4_TEXTXPOS           = $D04C
 VIC4_TEXTYPOS           = $D04E
+VIC4_CHRCOUNT           = $D05E
+VIC4_DISPROWS           = $D07B
 
 SCREEN_RAM              = $10000
 CHAR_DATA               = $40000
 CHAR_CODE_BASE          = $1000         ; $40000/64
 PTR = $FC                               ; 4-byte pointer
+
+MODE_BASIC      = 0
+MODE_TEXT40     = 1
+MODE_TEXT80     = 2
+MODE_BITMAP40   = 3
+MODE_BITMAP80   = 4
 
 ;=======================================================================================
 
@@ -52,88 +60,153 @@ screen_mode:
 ; main entry
 ;=======================================================================================
 main:
-        lda #80
-        sta screen_mode
-        jsr fcm_init
 
         ; Set background and border
         lda #$01                ; screen color
         sta BACKCOL
-        lda #$07                ; border
+        lda #$05                ; border
         sta BORDERCOL
 
-        lda #$04                ; space
-        jsr clear_screen_ram
-        jsr clear_color_ram
-        jsr set_palette
-
-        ; draw some custom chars
-        lda #0
-        ldx #0
-        ldy #0
-        jsr draw_char
-
-        lda #<_msg
-        sta str_ptr
-        lda #>_msg
-        sta str_ptr+1
-        lda #5                  ; row 5
-        sta str_row
-        lda #10                 ; column 10
-        sta str_col
-        lda #$00                ; black
-        sta str_color
-        jsr draw_petscii_string
-
-_loop:
-        ; change colors of character in loop
-        lda #1
-        ldx _color_val
-
-        inc _color_val
-        bne _not_zero       ; if it didn't wrap to 0, continue
-        inc _color_val      ; skip $00, go to $01
-_not_zero:
-        ldy _color_val
-        jsr set_color
-
-        jsr $FFE4
-        cmp #' '
-        bne _loop
-
+        jsr demo_text40
+        jsr demo_text80
         jsr demo_bitmap40
         jsr demo_bitmap80
+
+        lda #MODE_BASIC         ; Return to BASIC mode
+        jsr set_screen_mode
         rts
 
-_color_val:
-        .byte $01
+msg:
+        .text "FCM Demo - std PETSCII gfx",$00
 
-_msg:
-        .text "FCM DEMO"
-        .byte 0                 ; null terminator
+msg2:
+        .text "FCM Demo - 320x200 with 256 colors!",$00
+
+msg3:
+        .text "FCM Demo - 640x200 with 256 colors!",$00
+
+_allchars:
+        .byte $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E, $0F
+        .byte $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $1A, $1B, $1C, $1D, $1E, $1F
+        .byte $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $2A, $2B, $2C, $2D, $2E, $2F
+        .byte $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $3A, $3B, $3C, $3D, $3E, $3F
+        .byte $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $4A, $4B, $4C, $4D, $4E, $4F
+        .byte $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $5A, $5B, $5C, $5D, $5E, $5F
+        .byte $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $6A, $6B, $6C, $6D, $6E, $6F
+        .byte $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $7A, $7B, $7C, $7D, $7E, $7F
+        .byte $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $8A, $8B, $8C, $8D, $8E, $8F
+        .byte $90, $91, $92, $93, $94, $95, $96, $97, $98, $99, $9A, $9B, $9C, $9D, $9E, $9F
+        .byte $A0, $A1, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $A9, $AA, $AB, $AC, $AD, $AE, $AF
+        .byte $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $BA, $BB, $BC, $BD, $BE, $BF
+        .byte $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $CA, $CB, $CC, $CD, $CE, $CF
+        .byte $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DC, $DD, $DE, $DF
+        .byte $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE, $EF
+        .byte $F0, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $F8, $F9, $FA, $FB, $FC, $FD, $FE, $FF
+        .byte $00
 
 .include "fcm.asm"
 .include "text.asm"
 .include "bitmap.asm"
 
+demo_text40:
+        lda #MODE_TEXT40
+        jsr set_screen_mode
+
+        lda #$00                ; space
+        jsr clear_screen_ram
+
+        jsr set_palette
+
+        ; draw some custom chars
+        lda #1
+        ldx #10
+        ldy #10
+        jsr draw_char
+
+        lda #2
+        ldx #11
+        ldy #10
+        jsr draw_char
+
+        ; print a string using petscii ROM characters
+
+        lda #<msg
+        sta str_ptr
+        lda #>msg
+        sta str_ptr+1
+        lda #0                  ; row 0
+        sta str_row
+        lda #0                 ; column 10
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
+
+        _loop:
+        jsr $FFE4
+        cmp #' '
+        bne _loop
+
+        rts
+
+demo_text80:
+
+        lda #MODE_TEXT80
+        jsr set_screen_mode
+        jsr set_palette
+
+        lda #$00                ; space
+        jsr clear_screen_ram
+
+        ; draw some custom chars
+        lda #1
+        ldx #10
+        ldy #10
+        jsr draw_char
+
+        lda #2
+        ldx #11
+        ldy #10
+        jsr draw_char
+
+        ; print a string using petscii ROM characters
+
+        lda #<msg
+        sta str_ptr
+        lda #>msg
+        sta str_ptr+1
+        lda #0                  ; row 0
+        sta str_row
+        lda #0                 ; column 10
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
+
+        _loop:
+        jsr $FFE4
+        cmp #' '
+        bne _loop
+
+        rts
+
 demo_bitmap40:
 
-        lda #40
-        sta screen_mode
+        lda #MODE_BITMAP40
+        jsr set_screen_mode
 
-        jsr fcm_init
-        jsr clear_color_ram
-        jsr init_bitmap         ; Set up screen codes
-        
-        ; Set background and border
-        lda #$01                ; screen color
-        sta BACKCOL
-        lda #$07                ; border
-        sta BORDERCOL
+        lda #<msg2
+        sta str_ptr
+        lda #>msg2
+        sta str_ptr+1
+        lda #0                  ; row 0
+        sta str_row
+        lda #0                 ; column 10
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
 
-        lda #$00                ; Clear to background
-        jsr clear_bitmap
-        
         ; Plot a red pixel at (100, 50)
         lda #100
         sta plot_x
@@ -144,20 +217,8 @@ demo_bitmap40:
         lda #$02                ; Red (palette entry 2)
         sta plot_col
         jsr plot_pixel
-        
-        ; Plot a white pixel at (200, 100)
-        lda #200
-        sta plot_x
-        lda #0
-        sta plot_x+1
-        lda #100
-        sta plot_y
-        lda #$02                ; red
-        sta plot_col
-        jsr plot_pixel
 
-
-        ; Draw a red line from (0, 0) to (319, 199)
+        ; Draw a red horizontal line -  0,104 to 319,104
         lda #0
         sta line_x0
         lda #0
@@ -229,33 +290,98 @@ demo_bitmap40:
         sta line_col
         jsr draw_line
 
+        ; Outline circle at (160, 100) radius 50
+        lda #<160
+        sta circ_cx
+        lda #>160
+        sta circ_cx+1
+        lda #100
+        sta circ_cy
+        lda #50
+        sta circ_r
+        lda #$12                ; Red
+        sta circ_col
+        clc                     ; Outline
+        jsr draw_circle
+
+        ; Filled circle at (200, 80) radius 30
+        lda #<200
+        sta circ_cx
+        lda #>200
+        sta circ_cx+1
+        lda #80
+        sta circ_cy
+        lda #30
+        sta circ_r
+        lda #$08                ; Orange
+        sta circ_col
+        sec                     ; Filled
+        jsr draw_circle
+
+        ; draw a colorful series of lines
+        ; Draw a horizontal lines of varying colors -  0,120 to 255,190
+        lda #$00
+        sta _cur_color
+        lda #50
+        sta _cur_x
+_draw_colorful_lines:
+        lda _cur_x
+        sta line_x0
+        lda #0
+        sta line_x0+1
+        lda #120
+        sta line_y0
+
+        lda _cur_x
+        sta line_x1
+        lda #0
+        sta line_x1+1
+        lda #190
+        sta line_y1
+
+        lda _cur_color                ; Red
+        sta line_col
+        jsr draw_line
+
+        inc _cur_color
+        lda _cur_x
+        cmp #$ff
+        beq _loop
+        inc _cur_x
+        jmp _draw_colorful_lines
+
 _loop:
         jsr $FFE4
         cmp #' '
         bne _loop
 
-        jsr fcm_exit
         rts
+
+_cur_color:
+        .byte $00
+_cur_x:
+        .byte 50
 
 
 demo_bitmap80:
 
-        lda #80
-        sta screen_mode
-
-        jsr fcm_init
-        jsr clear_color_ram
-        jsr init_bitmap         ; Set up screen codes
+        lda #MODE_BITMAP80
+        jsr set_screen_mode
         
-        ; Set background and border
-        lda #$01                ; screen color
-        sta BACKCOL
-        lda #$07                ; border
-        sta BORDERCOL
+        ; print a string using petscii ROM characters
 
-        lda #$00                ; Clear to background
-        jsr clear_bitmap
-        
+        lda #<msg3
+        sta str_ptr
+        lda #>msg3
+        sta str_ptr+1
+        lda #0                  ; row 0
+        sta str_row
+        lda #0                 ; column 10
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
+
         ; Plot a red pixel at (100, 50)
         lda #100
         sta plot_x
@@ -266,18 +392,6 @@ demo_bitmap80:
         lda #$02                ; Red (palette entry 2)
         sta plot_col
         jsr plot_pixel
-        
-        ; Plot a white pixel at (200, 100)
-        lda #200
-        sta plot_x
-        lda #0
-        sta plot_x+1
-        lda #100
-        sta plot_y
-        lda #$02                ; red
-        sta plot_col
-        jsr plot_pixel
-
 
         ; Draw a red line from (0, 0) to (319, 199)
         lda #0
@@ -351,11 +465,76 @@ demo_bitmap80:
         sta line_col
         jsr draw_line
 
+; Outline circle at (360, 100) radius 50
+        lda #<360
+        sta circ_cx
+        lda #>360
+        sta circ_cx+1
+        lda #100
+        sta circ_cy
+        lda #50
+        sta circ_r
+        lda #$12                ; Red
+        sta circ_col
+        clc                     ; Outline
+        jsr draw_circle
+
+        ; Filled circle at (500, 80) radius 30
+        lda #<500
+        sta circ_cx
+        lda #>500
+        sta circ_cx+1
+        lda #80
+        sta circ_cy
+        lda #30
+        sta circ_r
+        lda #$08                ; Orange
+        sta circ_col
+        sec                     ; Filled
+        jsr draw_circle
+
+
+        ; draw a colorful series of lines
+        ; Draw a horizontal lines of varying colors -  0,120 to 255,190
+        lda #$00
+        sta _cur_color
+        lda #50
+        sta _cur_x
+_draw_colorful_lines:
+        lda _cur_x
+        sta line_x0
+        lda #0
+        sta line_x0+1
+        lda #120
+        sta line_y0
+
+        lda _cur_x
+        sta line_x1
+        lda #0
+        sta line_x1+1
+        lda #190
+        sta line_y1
+
+        lda _cur_color                ; Red
+        sta line_col
+        jsr draw_line
+
+        inc _cur_color
+        lda _cur_x
+        cmp #$ff
+        beq _loop
+        inc _cur_x
+        jmp _draw_colorful_lines
+
 _loop:
         jsr $FFE4
         cmp #' '
         bne _loop
 
-        jsr fcm_exit
-
         rts
+
+_cur_color:
+        .byte $00
+_cur_x:
+        .byte 50
+

@@ -191,6 +191,58 @@ draw_petscii:
         sty _dp_col
         stx _dp_row
         stz _dp_color
+
+; Default high byte (no attributes)
+        lda #$00
+        sta _dp_hibyte
+        
+        ; Convert PETSCII/ASCII to screen code
+        lda _dp_char
+
+        cmp #$40
+        bcc _dp_have_code       ; $00-$3F unchanged
+
+        beq _dp_at              ; $40 '@' -> $00
+
+        cmp #$5B
+        bcc _dp_lower_alpha     ; $41-$5A -> 1..26  (a..z)
+
+        cmp #$60
+        bcc _dp_brackets        ; $5B-$5F -> $1B-$1F
+
+        cmp #$C1
+        bcc _dp_have_code       ; $60-$C0 leave as-is (includes graphics range)
+
+        cmp #$DB
+        bcc _dp_upper_alpha     ; $C1-$DA -> 65..90 (A..Z)
+
+        jmp _dp_have_code       ; $DB-$FF leave as-is
+
+
+_dp_at:
+        lda #$00
+        sta _dp_char
+        jmp _dp_have_code
+
+_dp_lower_alpha:
+        sec
+        sbc #$40                ; $41->1, $5A->26
+        sta _dp_char
+        jmp _dp_have_code
+
+_dp_upper_alpha:
+        sec
+        sbc #$80                ; $C1->65, $DA->90
+        sta _dp_char
+        jmp _dp_have_code
+
+_dp_brackets:
+        sec
+        sbc #$40                ; $5B->1B ... $5F->1F
+        sta _dp_char
+        jmp _dp_have_code
+        
+_dp_have_code:
         
         ; Calculate offset = row × LINESTEP + col × 2
         lda _dp_row
@@ -278,9 +330,12 @@ _dp_not_80:
         lda #$0F
         sta PTR+3
         
-        ; Write color to byte 1 (foreground color)
-        ldz #1
-        lda _dp_color
+        ; Write color bytes
+        ldz #0
+        lda #$00                ; Byte 0: NCM=0 for traditional charset
+        sta [PTR],z
+        inz
+        lda _dp_color           ; Byte 1: foreground color
         sta [PTR],z
         
         rts
@@ -292,7 +347,7 @@ _dp_lo:     .byte 0
 _dp_hi:     .byte 0
 _dp_tmp:    .word 0
 _dp_color:  .byte 0
-
+_dp_hibyte: .byte 0
 
 ;=======================================================================================
 ; draw_petscii_string - Draw a null-terminated string at screen position with wrapping
@@ -415,76 +470,242 @@ clear_screen_ram:
         ; Input: A = character index (0=space, 1=box, 2=letter_a, etc.)
         
         ; Calculate screen code: CHAR_DATA/64 + index
-        clc
-        adc #<(CHAR_DATA/64)
-        sta _csr_code
-        lda #>(CHAR_DATA/64)
-        adc #0                  ; add carry
-        sta _csr_code+1
+;        clc
+;        adc #<(CHAR_DATA/64)
+;        sta _csr_code
+;        lda #>(CHAR_DATA/64)
+;        adc #0                  ; add carry
+;        sta _csr_code+1
         
         ; Set up pointer to SCREEN_RAM
-        lda #<SCREEN_RAM
-        sta PTR
-        lda #>SCREEN_RAM
-        sta PTR+1
-        lda #`SCREEN_RAM
-        sta PTR+2
-        lda #0
-        sta PTR+3
+;        lda #<SCREEN_RAM
+;        sta PTR
+;        lda #>SCREEN_RAM
+;        sta PTR+1
+;        lda #`SCREEN_RAM
+;        sta PTR+2
+;        lda #0
+;        sta PTR+3
         
         ; Count based on screen_mode
-        lda screen_mode
-        cmp #80
-        bne _csr_40
+;        lda screen_mode
+;        cmp #80
+;        bne _csr_40
         
         ; 80-col: 2000 cells
-        lda #<2000
-        sta _csr_cnt
-        lda #>2000
-        sta _csr_cnt+1
-        jmp _csr_loop
+;        lda #<2000
+;        sta _csr_cnt
+;        lda #>2000
+;        sta _csr_cnt+1
+;        jmp _csr_loop
         
-_csr_40:
+;_csr_40:
         ; 40-col: 1000 cells
-        lda #<1000
-        sta _csr_cnt
-        lda #>1000
-        sta _csr_cnt+1
+;        lda #<1000
+;        sta _csr_cnt
+;        lda #>1000
+;        sta _csr_cnt+1
         
-_csr_loop:
-        ldz #0
-        lda _csr_code           ; low byte of screen code
-        sta [PTR],z
-        inz
-        lda _csr_code+1         ; high byte of screen code
-        sta [PTR],z
+;_csr_loop:
+;        ldz #0
+;        lda _csr_code           ; low byte of screen code
+;        sta [PTR],z
+;        inz
+;        lda _csr_code+1         ; high byte of screen code
+;        sta [PTR],z
         
         ; PTR += 2
-        clc
-        lda PTR
-        adc #2
-        sta PTR
-        bcc +
-        inc PTR+1
-        bne +
-        inc PTR+2
-+
+;        clc
+;        lda PTR
+;        adc #2
+;        sta PTR
+;        bcc +
+;        inc PTR+1
+;        bne +
+;        inc PTR+2
+;+
         ; Decrement counter
-        lda _csr_cnt
-        bne _csr_dec
-        dec _csr_cnt+1
-_csr_dec:
-        dec _csr_cnt
-        lda _csr_cnt
-        ora _csr_cnt+1
-        bne _csr_loop
+;        lda _csr_cnt
+;        bne _csr_dec
+;        dec _csr_cnt+1
+;_csr_dec:
+;        dec _csr_cnt
+;        lda _csr_cnt
+;        ora _csr_cnt+1
+;        bne _csr_loop
         
+;        rts
+
+;_csr_code: .word 0
+;_csr_cnt:  .word 0
+
+        ; Calculate screen code: CHAR_DATA/64 + index
+        clc
+        adc #<(CHAR_DATA/64)
+        sta _csr_lo
+        lda #>(CHAR_DATA/64)
+        adc #0
+        sta _csr_hi
+
+        ; Set count based on mode
+        lda screen_mode
+        cmp #80
+        bne +
+        ; 80-col: 2000 positions
+        lda #<2000
+        sta _csr_dma1_cnt
+        sta _csr_dma2_cnt
+        lda #>2000
+        sta _csr_dma1_cnt+1
+        sta _csr_dma2_cnt+1
+        jmp _csr_go
++       ; 40-col: 1000 positions
+        lda #<1000
+        sta _csr_dma1_cnt
+        sta _csr_dma2_cnt
+        lda #>1000
+        sta _csr_dma1_cnt+1
+        sta _csr_dma2_cnt+1
+
+_csr_go:
+        ; DMA 1: Fill even bytes with low byte of screen code, step=2
+        lda _csr_lo
+        sta _csr_val1
+        lda #$00
+        sta $D707
+        .byte $81, $00          ; dest MB
+        .byte $85, $02          ; dest step integer = 2
+        .byte $84, $00          ; dest step fraction = 0
+        .byte $00               ; end options
+        .byte $03               ; fill
+_csr_dma1_cnt:
+        .word 1000              ; count (self-modified)
+_csr_val1:
+        .byte $00, $00          ; fill value (low byte self-modified)
+        .byte $00               ; src bank
+        .word $0000             ; dest = $10000
+        .byte $01               ; dest bank
+        .byte $00               ; cmd high
+        .word $0000             ; modulo
+
+        ; DMA 2: Fill odd bytes with high byte of screen code, step=2
+        lda _csr_hi
+        sta _csr_val2
+        lda #$00
+        sta $D707
+        .byte $81, $00          ; dest MB
+        .byte $85, $02          ; dest step integer = 2
+        .byte $84, $00          ; dest step fraction = 0
+        .byte $00               ; end options
+        .byte $03               ; fill
+_csr_dma2_cnt:
+        .word 1000              ; count (self-modified)
+_csr_val2:
+        .byte $00, $00          ; fill value (high byte self-modified)
+        .byte $00               ; src bank
+        .word $0001             ; dest = $10001
+        .byte $01               ; dest bank
+        .byte $00               ; cmd high
+        .word $0000             ; modulo
         rts
 
-_csr_code: .word 0
-_csr_cnt:  .word 0
+_csr_lo: .byte 0
+_csr_hi: .byte 0
 
+;=======================================================================================
+; clear_color_ram_text - Clear color RAM for text mode (NCM=0)
+; Sets foreground to specified color
+; Input: A = foreground color
+;=======================================================================================
+clear_color_ram_text:
+;        sta _ccrt_color
+        
+;        lda #$00
+;        sta PTR
+;        lda #$00
+;        sta PTR+1
+;        lda #$F8
+;        sta PTR+2
+;        lda #$0F
+;        sta PTR+3
 
+        ; Clear 5500 bytes for TEXTYPOS offset
+;        lda #<5500
+;        sta _ccrt_cnt
+;        lda #>5500
+;        sta _ccrt_cnt+1
+
+;_ccrt_loop:
+;        ldz #0
+;        lda #$00                ; Byte 0: NCM=0, no special attributes
+;        sta [PTR],z
+
+;        inc PTR
+;        bne +
+;        inc PTR+1
+;        bne +
+ ;       inc PTR+2
+;+
+;        lda _ccrt_color         ; Byte 1: foreground color
+;        sta [PTR],z
+
+;        inc PTR
+;        bne +
+;        inc PTR+1
+ ;       bne +
+;        inc PTR+2
+;+
+;        lda _ccrt_cnt
+;        bne +
+;        dec _ccrt_cnt+1
+;+       dec _ccrt_cnt
+;        lda _ccrt_cnt
+;        ora _ccrt_cnt+1
+;        bne _ccrt_loop
+;        rts
+
+;_ccrt_color: .byte 0
+;_ccrt_cnt:   .word 0
+
+        sta _ccrt_fill_val      ; Self-modify fill value for step 2
+        
+        ; Step 1: Fill all 5500 bytes at $0FF80000 with $00
+        lda #$00
+        sta $D707
+        .byte $0b                ; use 11-byte F018 list format 
+        .byte $81, $FF           ; destination address bits 20–27 (MB select) :contentReference[oaicite:5]{index=5}
+        .byte $85, $02           ; dest skip whole = 2 bytes (every other byte) :contentReference[oaicite:7]{index=7}
+        .byte $00                ; end of option list :contentReference[oaicite:8]{index=8}
+
+        .byte $03               ; fill command
+        .word 5500              ; count
+        .word $0000             ; fill value = $00
+        .byte $00               ; source bank
+        .word $0000             ; dest = $FF80000
+        .byte $08               ; dest bank
+        .byte $00               ; command high
+        .word $0000             ; modulo
+
+        
+        ; Step 2: Fill color at every other byte (2750 positions)
+        lda #$00
+        sta $D707
+        .byte $0b                ; use 11-byte F018 list format :contentReference[oaicite:4]{index=4}
+        .byte $81, $FF           ; destination address bits 20–27 (MB select) :contentReference[oaicite:5]{index=5}
+        .byte $85, $02           ; dest skip whole = 2 bytes (every other byte) :contentReference[oaicite:7]{index=7}
+        .byte $00                ; end of option list :contentReference[oaicite:8]{index=8}
+
+        .byte $03               ; fill command
+        .word 2750              ; count
+_ccrt_fill_val:
+        .byte $05, $00          ; fill value (low byte self-modified with color)
+        .byte $00               ; source bank
+        .word $0001             ; dest = $FF80001 (odd bytes)
+        .byte $08               ; dest bank
+        .byte $00               ; command high
+        .word $0000             ; modulo
+
+        rts
 
 ;===========================================================================================
 ; sets the palette of colors
@@ -517,6 +738,16 @@ set_palette:
 ; directly. Instead, it will select the colour code defined by the colour RAM
 custom_chars_start:
 
+space:
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+
 f1:
 .byte $00, $00, $00, $AA, $AA, $AA, $00, $00
 .byte $00, $00, $AA, $0F, $0F, $0F, $AA, $00
@@ -526,6 +757,16 @@ f1:
 .byte $00, $00, $00, $AA, $0F, $AA, $00, $00
 .byte $00, $00, $00, $AA, $0F, $AA, $00, $00
 .byte $00, $00, $00, $AA, $0F, $AA, $00, $00
+
+f2:
+.byte $00, $00, $00, $AA, $0F, $AA, $00, $00
+.byte $00, $00, $AA, $0F, $0F, $0F, $AA, $00
+.byte $00, $AA, $0F, $0F, $0F, $0F, $0F, $AA
+.byte $00, $AA, $0F, $0F, $0F, $0F, $0F, $AA
+.byte $00, $AA, $0F, $0F, $0F, $0F, $0F, $AA
+.byte $00, $AA, $AA, $AA, $AA, $AA, $AA, $AA
+.byte $00, $00, $00, $AA, $00, $AA, $00, $00
+.byte $00, $00, $00, $AA, $00, $AA, $00, $00
 
 
 box:
@@ -558,14 +799,6 @@ block:
 .byte $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA
 .byte $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA
 
-space:
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $00, $00, $00, $00, $00, $00, $00, $00
+
 
 custom_chars_end:

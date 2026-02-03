@@ -1,7 +1,3 @@
-;=======================================================================================
-; bitmap.asm - Combined 40/80 column bitmap routines
-; Checks screen_mode (40 or 80) to adjust calculations
-;=======================================================================================
 
 ;=======================================================================================
 ; init_bitmap - Fill screen with sequential codes for bitmap mode
@@ -22,15 +18,10 @@ init_bitmap:
         lda #>CHAR_CODE_BASE
         sta _ib_code+1
         
-        ; Set count based on mode
-        ldx #0                  ; Index: 0=40-col, 2=80-col
-        lda screen_mode
-        cmp #80
-        bne +
-        ldx #2
-+       lda char_counts,x
+        ; Force 3000 positions for testing
+        lda #<3000
         sta _ib_cnt
-        lda char_counts+1,x
+        lda #>3000
         sta _ib_cnt+1
         
 _ib_loop:
@@ -66,116 +57,237 @@ _ib_loop:
 
 _ib_code:       .word 0
 _ib_cnt:        .word 0
-char_counts:    .word 1000, 2000        ; 40-col, 80-col
+char_counts:    .word 1000, 2750        ; 40-col, 80-col
 
 ;=======================================================================================
 ; clear_bitmap - Clear all pixel data to a single color
 ; 40-col: 250×256 bytes, 80-col: 500×256 bytes
 ;=======================================================================================
 clear_bitmap:
-        sta _cb_color
+;        sta _cb_color
         
-        lda #<CHAR_DATA
-        sta PTR
-        lda #>CHAR_DATA
-        sta PTR+1
-        lda #`CHAR_DATA
-        sta PTR+2
-        lda #0
-        sta PTR+3
+;        lda #<CHAR_DATA
+;        sta PTR
+;        lda #>CHAR_DATA
+;        sta PTR+1
+;        lda #`CHAR_DATA
+;        sta PTR+2
+;        lda #0
+;        sta PTR+3
         
         ; Set iteration count based on mode
-        ldx #0
+;        ldx #0
+;        lda screen_mode
+;        cmp #80
+;        bne +
+;        ldx #2
+;+       lda _clear_counts,x
+;        sta _cb_outer
+;        lda _clear_counts+1,x
+;        sta _cb_outer+1
+        
+;_cb_outer_loop:
+;        ldz #0
+;_cb_inner_loop:
+;        lda _cb_color
+;        sta [PTR],z
+;        inz
+;        bne _cb_inner_loop
+        
+;       inc PTR+1
+;        bne +
+;        inc PTR+2
+;+
+;        lda _cb_outer
+;        bne +
+;        dec _cb_outer+1
+;+       dec _cb_outer
+;        lda _cb_outer
+;        ora _cb_outer+1
+;        bne _cb_outer_loop
+        
+;        rts
+
+;_cb_color:      .byte 0
+;_cb_outer:      .word 0
+;_clear_counts:  .word 250, 688          ; 40-col: 250×256=64KB, 80-col: 688×256=176KB
+
+
+; DMA works, but returning to basic causes cursor to disappear!
+
+        sta _cb_fill
+
         lda screen_mode
         cmp #80
-        bne +
-        ldx #2
-+       lda _clear_counts,x
-        sta _cb_outer
-        lda _clear_counts+1,x
-        sta _cb_outer+1
-        
-_cb_outer_loop:
-        ldz #0
-_cb_inner_loop:
-        lda _cb_color
-        sta [PTR],z
-        inz
-        bne _cb_inner_loop
-        
-        inc PTR+1
-        bne +
-        inc PTR+2
-+
-        lda _cb_outer
-        bne +
-        dec _cb_outer+1
-+       dec _cb_outer
-        lda _cb_outer
-        ora _cb_outer+1
-        bne _cb_outer_loop
-        
+        beq _cb_80col
+
+        ; 40-col: single DMA, 64000 bytes at $40000
+        lda _cb_fill
+        sta _cb_40_val
+        lda #$00
+        sta $D707
+        .byte $80, $00          ; source MB = $00
+        .byte $81, $00          ; dest MB
+        .byte $00               ; end options
+        .byte $03               ; fill
+        .word 64000             ; count
+_cb_40_val:
+        .byte $00, $00          ; fill value (self-modified)
+        .byte $00               ; src bank
+        .word $0000             ; dest addr
+        .byte $04               ; dest bank ($40000)
+        .byte $00               ; cmd high
+        .word $0000             ; modulo
         rts
 
-_cb_color:      .byte 0
-_cb_outer:      .word 0
-_clear_counts:  .word 250, 500          ; 40-col, 80-col
+_cb_80col:
+        ; 80-col: 128000 bytes = 65536 + 62464 (banks 4+5 only)
+
+        ; DMA 1: 65536 bytes at $40000
+        lda _cb_fill
+        sta _cb_80_val1
+        lda #$00
+        sta $D707
+        .byte $81, $00
+        .byte $00
+        .byte $03
+        .word $0000             ; count 0 = 65536
+_cb_80_val1:
+        .byte $00, $00
+        .byte $00
+        .word $0000
+        .byte $04               ; bank 4
+        .byte $00
+        .word $0000
+
+        ; DMA 2: 62464 bytes at $50000 (128000 - 65536)
+        lda _cb_fill
+        sta _cb_80_val2
+        lda #$00
+        sta $D707
+        .byte $81, $00
+        .byte $00
+        .byte $03
+        .word 62464
+_cb_80_val2:
+        .byte $00, $00
+        .byte $00
+        .word $0000
+        .byte $05               ; bank 5
+        .byte $00
+        .word $0000
+        rts
+
+_cb_fill: .byte 0
 
 
 ;=======================================================================================
 ; clear_color_ram - Clear color RAM for bitmap mode
 ;=======================================================================================
 clear_color_ram:
-        lda #$00
-        sta PTR
-        lda #$00
-        sta PTR+1
-        lda #$F8
-        sta PTR+2
-        lda #$0F
-        sta PTR+3
+;        lda #$00
+;        sta PTR
+;        lda #$00
+;        sta PTR+1
+;        lda #$F8
+;        sta PTR+2
+;        lda #$0F
+;        sta PTR+3
 
-        ; Set count based on mode
+        ; Always clear 2750 positions (5500 bytes) for 80-col
+        ; or 1000 for 40-col
+;        ldx #0
+;        lda screen_mode
+;        cmp #80
+;        bne +
+;        ldx #2
+;+       lda _ccr_counts,x
+;        sta _ccr_cnt
+;        lda _ccr_counts+1,x
+;        sta _ccr_cnt+1
+
+;_ccr_loop:
+;        ldz #0
+;        lda #$00
+;        sta [PTR],z
+
+;        inc PTR
+;        bne +
+;        inc PTR+1
+;        bne +
+;        inc PTR+2
+;+
+;        lda #$01
+;        sta [PTR],z
+
+;        inc PTR
+;        bne +
+;        inc PTR+1
+;        bne +
+;        inc PTR+2
+;+
+;        lda _ccr_cnt
+;        bne +
+;        dec _ccr_cnt+1
+;+       dec _ccr_cnt
+;        lda _ccr_cnt
+;        ora _ccr_cnt+1
+;        bne _ccr_loop
+;        rts
+
+;_ccr_cnt: .word 0
+;_ccr_counts: .word 1000, 2750    ; 40-col, 80-col
+
+        ; Self-modify counts based on mode
         ldx #0
         lda screen_mode
         cmp #80
         bne +
         ldx #2
-+       lda char_counts,x      ; Reuse char_counts table
-        sta _ccr_cnt
-        lda char_counts+1,x
-        sta _ccr_cnt+1
++       lda _ccr_byte_counts,x
+        sta _ccr_dma1_cnt
+        lda _ccr_byte_counts+1,x
+        sta _ccr_dma1_cnt+1
+        lda _ccr_pos_counts,x
+        sta _ccr_dma2_cnt
+        lda _ccr_pos_counts+1,x
+        sta _ccr_dma2_cnt+1
 
-_ccr_loop:
-        ldz #0
+        ; DMA 1: Fill all bytes with $00 (clears NCM/GOTO bits)
         lda #$00
-        sta [PTR],z
+        sta $D707
+        .byte $81, $FF          ; dest MB
+        .byte $00               ; end options
+        .byte $03               ; fill command
+_ccr_dma1_cnt:
+        .word 5500              ; count (self-modified)
+        .byte $00, $00          ; fill value = $00
+        .byte $00               ; src bank
+        .word $0000             ; dest = $FF80000
+        .byte $08               ; dest bank
+        .byte $00               ; cmd high
+        .word $0000             ; modulo
 
-        inc PTR
-        bne +
-        inc PTR+1
-        bne +
-        inc PTR+2
-+
-        lda #$01
-        sta [PTR],z
-
-        inc PTR
-        bne +
-        inc PTR+1
-        bne +
-        inc PTR+2
-+
-        lda _ccr_cnt
-        bne +
-        dec _ccr_cnt+1
-+       dec _ccr_cnt
-        lda _ccr_cnt
-        ora _ccr_cnt+1
-        bne _ccr_loop
+        ; DMA 2: Fill odd bytes with $01 (foreground), step=2
+        lda #$00
+        sta $D707
+        .byte $81, $FF          ; dest MB
+        .byte $85, $02          ; dest step integer = 2
+        .byte $84, $00          ; dest step fraction = 0
+        .byte $00               ; end options
+        .byte $03               ; fill command
+_ccr_dma2_cnt:
+        .word 2750              ; count (self-modified)
+        .byte $01, $00          ; fill value = $01
+        .byte $00               ; src bank
+        .word $0001             ; dest = $FF80001 (odd bytes)
+        .byte $08               ; dest bank
+        .byte $00               ; cmd high
+        .word $0000             ; modulo
         rts
 
-_ccr_cnt: .word 0
+_ccr_byte_counts: .word 2000, 5500     ; total bytes: 40-col, 80-col
+_ccr_pos_counts:  .word 1000, 2750     ; positions: 40-col, 80-col
 
 
 ;=======================================================================================
@@ -681,3 +793,418 @@ _rc_x1:     .word 0
 _rc_y1:     .byte 0
 _rc_fill:   .byte 0
 _rc_cur_y:  .byte 0
+
+;=======================================================================================
+; draw_circle - Draw circle (outline or filled) using midpoint algorithm
+; Input: circ_cx (16-bit), circ_cy (8-bit), circ_r (8-bit), circ_col (8-bit)
+;        Carry: clear=outline, set=filled
+; Automatically doubles x offsets in 80-col mode for correct aspect ratio
+;=======================================================================================
+circ_cx:    .word 0
+circ_cy:    .byte 0
+circ_r:     .byte 0
+circ_col:   .byte 0
+
+draw_circle:
+        lda #0
+        rol
+        sta _cr_fill
+
+        lda #0
+        sta _cr_x
+        lda circ_r
+        sta _cr_y
+
+        sec
+        lda #1
+        sbc circ_r
+        sta _cr_d
+        lda #0
+        sbc #0
+        sta _cr_d+1
+
+_cr_loop:
+        lda _cr_x
+        cmp _cr_y
+        beq +
+        bcs _cr_done
++
+        ; Compute aspect-corrected horizontal offsets
+        lda _cr_x
+        sta _cr_xh
+        lda #0
+        sta _cr_xh+1
+        lda _cr_y
+        sta _cr_yh
+        lda #0
+        sta _cr_yh+1
+
+        lda screen_mode
+        cmp #80
+        bne _cr_no_scale
+        asl _cr_xh
+        rol _cr_xh+1
+        asl _cr_yh
+        rol _cr_yh+1
+_cr_no_scale:
+
+        lda _cr_fill
+        bne _cr_do_fill
+        jsr _cr_plot_8
+        jmp _cr_update
+
+_cr_do_fill:
+        jsr _cr_fill_lines
+
+_cr_update:
+        lda _cr_d+1
+        bmi _cr_d_neg
+
+        lda _cr_x
+        sec
+        sbc _cr_y
+        sta _cr_tmp
+        lda #0
+        sbc #0
+        sta _cr_tmp+1
+        asl _cr_tmp
+        rol _cr_tmp+1
+        clc
+        lda _cr_tmp
+        adc #5
+        sta _cr_tmp
+        lda _cr_tmp+1
+        adc #0
+        sta _cr_tmp+1
+        clc
+        lda _cr_d
+        adc _cr_tmp
+        sta _cr_d
+        lda _cr_d+1
+        adc _cr_tmp+1
+        sta _cr_d+1
+        dec _cr_y
+        jmp _cr_inc_x
+
+_cr_d_neg:
+        lda _cr_x
+        asl
+        clc
+        adc #3
+        sta _cr_tmp
+        lda #0
+        adc #0
+        sta _cr_tmp+1
+        clc
+        lda _cr_d
+        adc _cr_tmp
+        sta _cr_d
+        lda _cr_d+1
+        adc _cr_tmp+1
+        sta _cr_d+1
+
+_cr_inc_x:
+        inc _cr_x
+        jmp _cr_loop
+
+_cr_done:
+        rts
+
+;---------------------------------------------------------------------------------------
+; _cr_plot_8 - Plot 8 symmetric points
+; Uses _cr_xh/_cr_yh (16-bit, aspect-corrected) for horizontal offsets
+; Uses _cr_x/_cr_y (8-bit) for vertical offsets
+;---------------------------------------------------------------------------------------
+_cr_plot_8:
+        lda circ_col
+        sta plot_col
+
+        ; Point 1: (cx+xh, cy+y)
+        clc
+        lda circ_cx
+        adc _cr_xh
+        sta plot_x
+        lda circ_cx+1
+        adc _cr_xh+1
+        sta plot_x+1
+        bmi +
+        clc
+        lda circ_cy
+        adc _cr_y
+        bcs +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 2: (cx-xh, cy+y)
+        sec
+        lda circ_cx
+        sbc _cr_xh
+        sta plot_x
+        lda circ_cx+1
+        sbc _cr_xh+1
+        sta plot_x+1
+        bmi +
+        clc
+        lda circ_cy
+        adc _cr_y
+        bcs +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 3: (cx+xh, cy-y)
+        clc
+        lda circ_cx
+        adc _cr_xh
+        sta plot_x
+        lda circ_cx+1
+        adc _cr_xh+1
+        sta plot_x+1
+        bmi +
+        sec
+        lda circ_cy
+        sbc _cr_y
+        bcc +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 4: (cx-xh, cy-y)
+        sec
+        lda circ_cx
+        sbc _cr_xh
+        sta plot_x
+        lda circ_cx+1
+        sbc _cr_xh+1
+        sta plot_x+1
+        bmi +
+        sec
+        lda circ_cy
+        sbc _cr_y
+        bcc +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 5: (cx+yh, cy+x)
+        clc
+        lda circ_cx
+        adc _cr_yh
+        sta plot_x
+        lda circ_cx+1
+        adc _cr_yh+1
+        sta plot_x+1
+        bmi +
+        clc
+        lda circ_cy
+        adc _cr_x
+        bcs +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 6: (cx-yh, cy+x)
+        sec
+        lda circ_cx
+        sbc _cr_yh
+        sta plot_x
+        lda circ_cx+1
+        sbc _cr_yh+1
+        sta plot_x+1
+        bmi +
+        clc
+        lda circ_cy
+        adc _cr_x
+        bcs +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 7: (cx+yh, cy-x)
+        clc
+        lda circ_cx
+        adc _cr_yh
+        sta plot_x
+        lda circ_cx+1
+        adc _cr_yh+1
+        sta plot_x+1
+        bmi +
+        sec
+        lda circ_cy
+        sbc _cr_x
+        bcc +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        ; Point 8: (cx-yh, cy-x)
+        sec
+        lda circ_cx
+        sbc _cr_yh
+        sta plot_x
+        lda circ_cx+1
+        sbc _cr_yh+1
+        sta plot_x+1
+        bmi +
+        sec
+        lda circ_cy
+        sbc _cr_x
+        bcc +
+        cmp #200
+        bcs +
+        sta plot_y
+        jsr plot_pixel
++
+        rts
+
+;---------------------------------------------------------------------------------------
+; _cr_fill_lines - Draw 4 horizontal lines for filled circle
+; Uses _cr_xh/_cr_yh for horizontal extents, _cr_x/_cr_y for vertical offsets
+;---------------------------------------------------------------------------------------
+_cr_fill_lines:
+        lda circ_col
+        sta line_col
+
+        ; Line 1: cy+y from cx-xh to cx+xh
+        clc
+        lda circ_cy
+        adc _cr_y
+        bcs _cr_fl_skip1
+        cmp #200
+        bcs _cr_fl_skip1
+        sta line_y0
+        sta line_y1
+        sec
+        lda circ_cx
+        sbc _cr_xh
+        sta line_x0
+        lda circ_cx+1
+        sbc _cr_xh+1
+        sta line_x0+1
+        bpl +
+        lda #0
+        sta line_x0
+        sta line_x0+1
++       clc
+        lda circ_cx
+        adc _cr_xh
+        sta line_x1
+        lda circ_cx+1
+        adc _cr_xh+1
+        sta line_x1+1
+        bmi _cr_fl_skip1
+        jsr draw_line
+_cr_fl_skip1:
+
+        ; Line 2: cy-y from cx-xh to cx+xh
+        sec
+        lda circ_cy
+        sbc _cr_y
+        bcc _cr_fl_skip2
+        cmp #200
+        bcs _cr_fl_skip2
+        sta line_y0
+        sta line_y1
+        sec
+        lda circ_cx
+        sbc _cr_xh
+        sta line_x0
+        lda circ_cx+1
+        sbc _cr_xh+1
+        sta line_x0+1
+        bpl +
+        lda #0
+        sta line_x0
+        sta line_x0+1
++       clc
+        lda circ_cx
+        adc _cr_xh
+        sta line_x1
+        lda circ_cx+1
+        adc _cr_xh+1
+        sta line_x1+1
+        bmi _cr_fl_skip2
+        jsr draw_line
+_cr_fl_skip2:
+
+        ; Line 3: cy+x from cx-yh to cx+yh
+        clc
+        lda circ_cy
+        adc _cr_x
+        bcs _cr_fl_skip3
+        cmp #200
+        bcs _cr_fl_skip3
+        sta line_y0
+        sta line_y1
+        sec
+        lda circ_cx
+        sbc _cr_yh
+        sta line_x0
+        lda circ_cx+1
+        sbc _cr_yh+1
+        sta line_x0+1
+        bpl +
+        lda #0
+        sta line_x0
+        sta line_x0+1
++       clc
+        lda circ_cx
+        adc _cr_yh
+        sta line_x1
+        lda circ_cx+1
+        adc _cr_yh+1
+        sta line_x1+1
+        bmi _cr_fl_skip3
+        jsr draw_line
+_cr_fl_skip3:
+
+        ; Line 4: cy-x from cx-yh to cx+yh
+        sec
+        lda circ_cy
+        sbc _cr_x
+        bcc _cr_fl_skip4
+        cmp #200
+        bcs _cr_fl_skip4
+        sta line_y0
+        sta line_y1
+        sec
+        lda circ_cx
+        sbc _cr_yh
+        sta line_x0
+        lda circ_cx+1
+        sbc _cr_yh+1
+        sta line_x0+1
+        bpl +
+        lda #0
+        sta line_x0
+        sta line_x0+1
++       clc
+        lda circ_cx
+        adc _cr_yh
+        sta line_x1
+        lda circ_cx+1
+        adc _cr_yh+1
+        sta line_x1+1
+        bmi _cr_fl_skip4
+        jsr draw_line
+_cr_fl_skip4:
+        rts
+
+;---------------------------------------------------------------------------------------
+; Circle working variables
+;---------------------------------------------------------------------------------------
+_cr_fill:   .byte 0
+_cr_x:      .byte 0
+_cr_y:      .byte 0
+_cr_d:      .word 0
+_cr_tmp:    .word 0
+_cr_xh:     .word 0             ; x offset scaled for aspect ratio
+_cr_yh:     .word 0             ; y offset scaled for aspect ratio
