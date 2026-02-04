@@ -69,57 +69,6 @@ _ib_counts: .word 1000, 3000    ; 40-col, 80-col
 ; 40-col: 250×256 bytes, 80-col: 500×256 bytes
 ;=======================================================================================
 clear_bitmap:
-;        sta _cb_color
-        
-;        lda #<CHAR_DATA
-;        sta PTR
-;        lda #>CHAR_DATA
-;        sta PTR+1
-;        lda #`CHAR_DATA
-;        sta PTR+2
-;        lda #0
-;        sta PTR+3
-        
-        ; Set iteration count based on mode
-;        ldx #0
-;        lda screen_mode
-;        cmp #80
-;        bne +
-;        ldx #2
-;+       lda _clear_counts,x
-;        sta _cb_outer
-;        lda _clear_counts+1,x
-;        sta _cb_outer+1
-        
-;_cb_outer_loop:
-;        ldz #0
-;_cb_inner_loop:
-;        lda _cb_color
-;        sta [PTR],z
-;        inz
-;        bne _cb_inner_loop
-        
-;       inc PTR+1
-;        bne +
-;        inc PTR+2
-;+
-;        lda _cb_outer
-;        bne +
-;        dec _cb_outer+1
-;+       dec _cb_outer
-;        lda _cb_outer
-;        ora _cb_outer+1
-;        bne _cb_outer_loop
-        
-;        rts
-
-;_cb_color:      .byte 0
-;_cb_outer:      .word 0
-;_clear_counts:  .word 250, 688          ; 40-col: 250×256=64KB, 80-col: 688×256=176KB
-
-
-; DMA works, but returning to basic causes cursor to disappear!
-
         sta _cb_fill
 
         lda screen_mode
@@ -190,58 +139,6 @@ _cb_fill: .byte 0
 ; clear_color_ram - Clear color RAM for bitmap mode
 ;=======================================================================================
 clear_color_ram:
-;        lda #$00
-;        sta PTR
-;        lda #$00
-;        sta PTR+1
-;        lda #$F8
-;        sta PTR+2
-;        lda #$0F
-;        sta PTR+3
-
-        ; Always clear 2750 positions (5500 bytes) for 80-col
-        ; or 1000 for 40-col
-;        ldx #0
-;        lda screen_mode
-;        cmp #80
-;        bne +
-;        ldx #2
-;+       lda _ccr_counts,x
-;        sta _ccr_cnt
-;        lda _ccr_counts+1,x
-;        sta _ccr_cnt+1
-
-;_ccr_loop:
-;        ldz #0
-;        lda #$00
-;        sta [PTR],z
-
-;        inc PTR
-;        bne +
-;        inc PTR+1
-;        bne +
-;        inc PTR+2
-;+
-;        lda #$01
-;        sta [PTR],z
-
-;        inc PTR
-;        bne +
-;        inc PTR+1
-;        bne +
-;        inc PTR+2
-;+
-;        lda _ccr_cnt
-;        bne +
-;        dec _ccr_cnt+1
-;+       dec _ccr_cnt
-;        lda _ccr_cnt
-;        ora _ccr_cnt+1
-;        bne _ccr_loop
-;        rts
-
-;_ccr_cnt: .word 0
-;_ccr_counts: .word 1000, 2750    ; 40-col, 80-col
 
         ; Self-modify counts based on mode
         ldx #0

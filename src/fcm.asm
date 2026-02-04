@@ -303,28 +303,7 @@ _ssm_exit_basic:
         sta BORDERCOL
         sta BACKCOL
 
-; Restore color RAM to default foreground
-;        lda #$00
-;        sta PTR
-;        lda #$00
-;        sta PTR+1
-;        lda #$F8
-;        sta PTR+2
-;        lda #$0F
-;        sta PTR+3
-;        
-;        ldx #22                 ; 5632 bytes = 22 × 256
-;_eb_clr:
-;        ldz #0
-;-       lda #$05                ; default MEGA65 text color
-;        sta [PTR],z
-;        inz
-;        bne -
-;        inc PTR+1
-;        dex
-;        bne _eb_clr
-
-; DMA: Reset color RAM to green ($05) for BASIC
+        ; DMA: Reset color RAM to green ($05) for BASIC
         ; Reset both MBs explicitly for clean KERNAL handoff
         lda #$00
         sta $D707
@@ -365,11 +344,6 @@ init_palette:
         sta $D100+$AA           ; $AA in char data for RED is set to $00
         sta $D200+$AA           ; $AA in char data for RED is set to $00
         sta $D300+$AA           ; $AA in char data for RED is set to $00
-
-        lda #$09
-        sta $D100+$BB
-        sta $D200+$BB
-        sta $D300+$BB
 
         rts
 

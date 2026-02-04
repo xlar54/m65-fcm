@@ -470,76 +470,6 @@ clear_screen_ram:
         ; Input: A = character index (0=space, 1=box, 2=letter_a, etc.)
         
         ; Calculate screen code: CHAR_DATA/64 + index
-;        clc
-;        adc #<(CHAR_DATA/64)
-;        sta _csr_code
-;        lda #>(CHAR_DATA/64)
-;        adc #0                  ; add carry
-;        sta _csr_code+1
-        
-        ; Set up pointer to SCREEN_RAM
-;        lda #<SCREEN_RAM
-;        sta PTR
-;        lda #>SCREEN_RAM
-;        sta PTR+1
-;        lda #`SCREEN_RAM
-;        sta PTR+2
-;        lda #0
-;        sta PTR+3
-        
-        ; Count based on screen_mode
-;        lda screen_mode
-;        cmp #80
-;        bne _csr_40
-        
-        ; 80-col: 2000 cells
-;        lda #<2000
-;        sta _csr_cnt
-;        lda #>2000
-;        sta _csr_cnt+1
-;        jmp _csr_loop
-        
-;_csr_40:
-        ; 40-col: 1000 cells
-;        lda #<1000
-;        sta _csr_cnt
-;        lda #>1000
-;        sta _csr_cnt+1
-        
-;_csr_loop:
-;        ldz #0
-;        lda _csr_code           ; low byte of screen code
-;        sta [PTR],z
-;        inz
-;        lda _csr_code+1         ; high byte of screen code
-;        sta [PTR],z
-        
-        ; PTR += 2
-;        clc
-;        lda PTR
-;        adc #2
-;        sta PTR
-;        bcc +
-;        inc PTR+1
-;        bne +
-;        inc PTR+2
-;+
-        ; Decrement counter
-;        lda _csr_cnt
-;        bne _csr_dec
-;        dec _csr_cnt+1
-;_csr_dec:
-;        dec _csr_cnt
-;        lda _csr_cnt
-;        ora _csr_cnt+1
-;        bne _csr_loop
-        
-;        rts
-
-;_csr_code: .word 0
-;_csr_cnt:  .word 0
-
-        ; Calculate screen code: CHAR_DATA/64 + index
         clc
         adc #<(CHAR_DATA/64)
         sta _csr_lo
@@ -618,54 +548,6 @@ _csr_hi: .byte 0
 ; Input: A = foreground color
 ;=======================================================================================
 clear_color_ram_text:
-;        sta _ccrt_color
-        
-;        lda #$00
-;        sta PTR
-;        lda #$00
-;        sta PTR+1
-;        lda #$F8
-;        sta PTR+2
-;        lda #$0F
-;        sta PTR+3
-
-        ; Clear 5500 bytes for TEXTYPOS offset
-;        lda #<5500
-;        sta _ccrt_cnt
-;        lda #>5500
-;        sta _ccrt_cnt+1
-
-;_ccrt_loop:
-;        ldz #0
-;        lda #$00                ; Byte 0: NCM=0, no special attributes
-;        sta [PTR],z
-
-;        inc PTR
-;        bne +
-;        inc PTR+1
-;        bne +
- ;       inc PTR+2
-;+
-;        lda _ccrt_color         ; Byte 1: foreground color
-;        sta [PTR],z
-
-;        inc PTR
-;        bne +
-;        inc PTR+1
- ;       bne +
-;        inc PTR+2
-;+
-;        lda _ccrt_cnt
-;        bne +
-;        dec _ccrt_cnt+1
-;+       dec _ccrt_cnt
-;        lda _ccrt_cnt
-;        ora _ccrt_cnt+1
-;        bne _ccrt_loop
-;        rts
-
-;_ccrt_color: .byte 0
-;_ccrt_cnt:   .word 0
 
         sta _ccrt_fill_val      ; Self-modify fill value for step 2
         

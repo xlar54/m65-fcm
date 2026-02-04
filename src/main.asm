@@ -88,24 +88,6 @@ msg3:
 msg_space
         .text "SPACE BAR to next demo screen",$00
 
-_allchars:
-        .byte $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E, $0F
-        .byte $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $1A, $1B, $1C, $1D, $1E, $1F
-        .byte $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $2A, $2B, $2C, $2D, $2E, $2F
-        .byte $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $3A, $3B, $3C, $3D, $3E, $3F
-        .byte $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $4A, $4B, $4C, $4D, $4E, $4F
-        .byte $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $5A, $5B, $5C, $5D, $5E, $5F
-        .byte $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $6A, $6B, $6C, $6D, $6E, $6F
-        .byte $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $7A, $7B, $7C, $7D, $7E, $7F
-        .byte $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $8A, $8B, $8C, $8D, $8E, $8F
-        .byte $90, $91, $92, $93, $94, $95, $96, $97, $98, $99, $9A, $9B, $9C, $9D, $9E, $9F
-        .byte $A0, $A1, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $A9, $AA, $AB, $AC, $AD, $AE, $AF
-        .byte $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $BA, $BB, $BC, $BD, $BE, $BF
-        .byte $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $CA, $CB, $CC, $CD, $CE, $CF
-        .byte $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DC, $DD, $DE, $DF
-        .byte $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE, $EF
-        .byte $F0, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $F8, $F9, $FA, $FB, $FC, $FD, $FE, $FF
-        .byte $00
 
 .include "fcm.asm"
 .include "text.asm"
@@ -120,6 +102,32 @@ demo_text40:
 
         jsr init_palette
 
+        ; print a string using petscii ROM characters
+
+        lda #<msg
+        sta str_ptr
+        lda #>msg
+        sta str_ptr+1
+        lda #0                  ; row 0
+        sta str_row
+        lda #0                 ; column 0
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
+
+        lda #<msg_space
+        sta str_ptr
+        lda #>msg_space
+        sta str_ptr+1
+        lda #1                  ; row 0
+        sta str_row
+        lda #0                 ; column 0
+        sta str_col
+        lda #$00                ; black
+        sta str_color
+        jsr draw_petscii_string
+
         ; draw some custom chars
         lda #1
         ldx #10
@@ -131,7 +139,7 @@ demo_text40:
         ldy #10
         jsr draw_char
 
-        ; draw folder
+        ; draw folder using custom chars
 
         ; Set folder palette colors
         lda #$A1                ; dark yellow (back/tab)
@@ -204,33 +212,8 @@ demo_text40:
         ldy #7
         jsr draw_char
 
-        ; print a string using petscii ROM characters
-
-        lda #<msg
-        sta str_ptr
-        lda #>msg
-        sta str_ptr+1
-        lda #0                  ; row 0
-        sta str_row
-        lda #0                 ; column 0
-        sta str_col
-        lda #$00                ; black
-        sta str_color
-        jsr draw_petscii_string
-
-        lda #<msg_space
-        sta str_ptr
-        lda #>msg_space
-        sta str_ptr+1
-        lda #1                  ; row 0
-        sta str_row
-        lda #0                 ; column 0
-        sta str_col
-        lda #$00                ; black
-        sta str_color
-        jsr draw_petscii_string
-
-        _loop:
+        
+_loop:
         jsr $FFE4
         cmp #' '
         bne _loop
@@ -245,17 +228,6 @@ demo_text80:
 
         lda #$00                ; space
         jsr clear_screen_ram
-
-        ; draw some custom chars
-        lda #1
-        ldx #10
-        ldy #10
-        jsr draw_char
-
-        lda #2
-        ldx #11
-        ldy #10
-        jsr draw_char
 
         ; print a string using petscii ROM characters
 
@@ -283,7 +255,91 @@ demo_text80:
         sta str_color
         jsr draw_petscii_string
 
-        _loop:
+        ; draw some custom chars
+        lda #1
+        ldx #10
+        ldy #10
+        jsr draw_char
+
+        lda #2
+        ldx #11
+        ldy #10
+        jsr draw_char
+
+                ; draw folder using custom chars
+
+        ; Set folder palette colors
+        lda #$A1                ; dark yellow (back/tab)
+        ldx #$0C
+        ldy #$09
+        ldz #$00
+        jsr set_palette_color
+
+        lda #$A2                ; light yellow (front panel)
+        ldx #$0F
+        ldy #$0C
+        ldz #$02
+        jsr set_palette_color
+
+        lda #$A3                ; white (document)
+        ldx #$0F
+        ldy #$0F
+        ldz #$0F
+        jsr set_palette_color
+
+        lda #$A4                ; grey (document fold)
+        ldx #$09
+        ldy #$09
+        ldz #$09
+        jsr set_palette_color
+
+        ; Draw folder at row 5, col 5 (3×3 chars)
+        lda #6                  ; folder_tl
+        ldx #5
+        ldy #5
+        jsr draw_char
+
+        lda #7                  ; folder_tc
+        ldx #5
+        ldy #6
+        jsr draw_char
+
+        lda #8                  ; folder_tr
+        ldx #5
+        ldy #7
+        jsr draw_char
+
+        lda #9                  ; folder_ml
+        ldx #6
+        ldy #5
+        jsr draw_char
+
+        lda #10                 ; folder_mc
+        ldx #6
+        ldy #6
+        jsr draw_char
+
+        lda #11                 ; folder_mr
+        ldx #6
+        ldy #7
+        jsr draw_char
+
+        lda #12                 ; folder_bl
+        ldx #7
+        ldy #5
+        jsr draw_char
+
+        lda #13                 ; folder_bc
+        ldx #7
+        ldy #6
+        jsr draw_char
+
+        lda #14                 ; folder_br
+        ldx #7
+        ldy #7
+        jsr draw_char
+
+_loop:
         jsr $FFE4
         cmp #' '
         bne _loop
