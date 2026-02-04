@@ -190,9 +190,10 @@ draw_petscii:
         sta _dp_char
         sty _dp_col
         stx _dp_row
-        stz _dp_color
+        tza                     ; Transfer Z register to A
+        sta _dp_color           ; Now stores actual color value
 
-; Default high byte (no attributes)
+        ; Default high byte (no attributes)
         lda #$00
         sta _dp_hibyte
         

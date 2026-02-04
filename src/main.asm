@@ -85,7 +85,7 @@ msg2:
 msg3:
         .text "FCM Demo - 640x200 with 256 colors!",$00
 
-msg_space
+msg_space:
         .text "SPACE BAR to next demo screen",$00
 
 
@@ -120,9 +120,9 @@ demo_text40:
         sta str_ptr
         lda #>msg_space
         sta str_ptr+1
-        lda #1                  ; row 0
+        lda #1                  ; row 1
         sta str_row
-        lda #0                 ; column 0
+        lda #0                  ; column 0
         sta str_col
         lda #$00                ; black
         sta str_color
