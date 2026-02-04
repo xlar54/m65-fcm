@@ -304,15 +304,15 @@ _ssm_exit_basic:
         sta BACKCOL
 
 ; Restore color RAM to default foreground
-        lda #$00
-        sta PTR
-        lda #$00
-        sta PTR+1
-        lda #$F8
-        sta PTR+2
-        lda #$0F
-        sta PTR+3
-        
+;        lda #$00
+;        sta PTR
+;        lda #$00
+;        sta PTR+1
+;        lda #$F8
+;        sta PTR+2
+;        lda #$0F
+;        sta PTR+3
+;        
 ;        ldx #22                 ; 5632 bytes = 22 × 256
 ;_eb_clr:
 ;        ldz #0
@@ -344,3 +344,55 @@ _ssm_exit_basic:
         rts
 
 _ssm_mode: .byte 0
+
+;===========================================================================================
+; sets the palette of colors
+; $00 is always transparent
+; $FF is special and is foreground color
+;
+;       $D100-$D1FF : red
+;       $D200-$D2FF : green
+;       $D300-$D3FF : blue
+;
+; load a color from $00-$FF into A
+; then STA to the RGB color registers, 
+; EXCEPT +$00 (always transparent) or +$FF (always color RAM foreground)
+;===========================================================================================
+init_palette:
+        ; establish the color BLACK
+        ; $AA is picked abritrarily to stand out in the character definition below
+        lda #$00
+        sta $D100+$AA           ; $AA in char data for RED is set to $00
+        sta $D200+$AA           ; $AA in char data for RED is set to $00
+        sta $D300+$AA           ; $AA in char data for RED is set to $00
+
+        rts
+
+;=======================================================================================
+; set_palette_color - Set a single palette entry to an RGB color
+; Input: A = palette index (0-255)
+;        X = red (0-15)
+;        Y = green (0-15)
+;        Z = blue (0-15)
+; Note: Index $00 is always transparent, $FF is always color RAM foreground
+; Destroys: A
+;=======================================================================================
+set_palette_color:
+        sta _spc_idx
+        stx _spc_r
+        sty _spc_g
+        tza
+        sta _spc_b
+        ldx _spc_idx
+        lda _spc_r
+        sta $D100,x
+        lda _spc_g
+        sta $D200,x
+        lda _spc_b
+        sta $D300,x
+        rts
+
+_spc_idx: .byte 0
+_spc_r:   .byte 0
+_spc_g:   .byte 0
+_spc_b:   .byte 0

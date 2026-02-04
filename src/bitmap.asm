@@ -1,7 +1,7 @@
 
 ;=======================================================================================
-; init_bitmap - Fill screen with sequential codes for bitmap mode
-; 40-col: 1000 chars, 80-col: 2000 chars
+; init_bitmap - Fill screen RAM with sequential codes for bitmap mode
+; 40-col: 1000 positions (40×25), 80-col: 2750 positions (80×25 + TEXTYPOS overflow)
 ;=======================================================================================
 init_bitmap:
         lda #<SCREEN_RAM
@@ -18,10 +18,15 @@ init_bitmap:
         lda #>CHAR_CODE_BASE
         sta _ib_code+1
         
-        ; Force 3000 positions for testing
-        lda #<3000
+        ; Set count based on screen mode
+        ldx #0
+        lda screen_mode
+        cmp #80
+        bne +
+        ldx #2
++       lda _ib_counts,x
         sta _ib_cnt
-        lda #>3000
+        lda _ib_counts+1,x
         sta _ib_cnt+1
         
 _ib_loop:
@@ -55,9 +60,9 @@ _ib_loop:
         
         rts
 
-_ib_code:       .word 0
-_ib_cnt:        .word 0
-char_counts:    .word 1000, 2750        ; 40-col, 80-col
+_ib_code:   .word 0
+_ib_cnt:    .word 0
+_ib_counts: .word 1000, 3000    ; 40-col, 80-col
 
 ;=======================================================================================
 ; clear_bitmap - Clear all pixel data to a single color
@@ -1208,3 +1213,473 @@ _cr_d:      .word 0
 _cr_tmp:    .word 0
 _cr_xh:     .word 0             ; x offset scaled for aspect ratio
 _cr_yh:     .word 0             ; y offset scaled for aspect ratio
+
+;=======================================================================================
+; draw_gradient_rect - Draw a filled rectangle with color gradient
+; Input: grad_x (16-bit), grad_y (8-bit), grad_w (16-bit), grad_h (8-bit)
+;        grad_r1, grad_g1, grad_b1 - start color RGB (0-15 each)
+;        grad_r2, grad_g2, grad_b2 - end color RGB (0-15 each)
+;        grad_pal - starting palette index
+;        grad_dir - 0 = horizontal gradient, 1 = vertical gradient
+; Uses only as many palette entries as unique colors needed (max 16)
+; Destroys: A, X, Y, Z, PTR
+;=======================================================================================
+grad_x:     .word 0
+grad_y:     .byte 0
+grad_w:     .word 0             ; 16-bit for widths > 255
+grad_h:     .byte 0
+grad_r1:    .byte 0
+grad_g1:    .byte 0
+grad_b1:    .byte 0
+grad_r2:    .byte 0
+grad_g2:    .byte 0
+grad_b2:    .byte 0
+grad_pal:   .byte 0
+grad_dir:   .byte 0
+
+draw_gradient_rect:
+        ; Pick iterations based on direction
+        lda grad_dir
+        bne _grd_vert_setup
+        lda grad_w
+        sta _grd_iterations
+        lda grad_w+1
+        sta _grd_iterations+1
+        jmp _grd_check_zero
+_grd_vert_setup:
+        lda grad_h
+        sta _grd_iterations
+        lda #0
+        sta _grd_iterations+1
+_grd_check_zero:
+        lda _grd_iterations
+        ora _grd_iterations+1
+        beq _grd_rts
+
+        ; --- Compute absolute deltas and directions ---
+
+        ; Red
+        sec
+        lda grad_r2
+        sbc grad_r1
+        bcs _grd_r_pos
+        eor #$FF
+        clc
+        adc #1
+        sta _grd_del_r
+        lda #$FF
+        sta _grd_dir_r
+        jmp _grd_g_delta
+_grd_r_pos:
+        sta _grd_del_r
+        lda #$01
+        sta _grd_dir_r
+
+_grd_g_delta:
+        sec
+        lda grad_g2
+        sbc grad_g1
+        bcs _grd_g_pos
+        eor #$FF
+        clc
+        adc #1
+        sta _grd_del_g
+        lda #$FF
+        sta _grd_dir_g
+        jmp _grd_b_delta
+_grd_g_pos:
+        sta _grd_del_g
+        lda #$01
+        sta _grd_dir_g
+
+_grd_b_delta:
+        sec
+        lda grad_b2
+        sbc grad_b1
+        bcs _grd_b_pos
+        eor #$FF
+        clc
+        adc #1
+        sta _grd_del_b
+        lda #$FF
+        sta _grd_dir_b
+        jmp _grd_calc_max
+_grd_b_pos:
+        sta _grd_del_b
+        lda #$01
+        sta _grd_dir_b
+
+_grd_calc_max:
+        ; max_delta = max(del_r, del_g, del_b)
+        lda _grd_del_r
+        sta _grd_max_delta
+        lda _grd_del_g
+        cmp _grd_max_delta
+        bcc +
+        sta _grd_max_delta
++       lda _grd_del_b
+        cmp _grd_max_delta
+        bcc +
+        sta _grd_max_delta
++
+        ; num_colors = min(max_delta + 1, iterations)
+        lda _grd_max_delta
+        clc
+        adc #1
+        sta _grd_num_colors
+        lda _grd_iterations+1
+        bne _grd_nc_ok          ; iterations >= 256, always > num_colors
+        lda _grd_num_colors
+        cmp _grd_iterations
+        bcc _grd_nc_ok
+        beq _grd_nc_ok
+        lda _grd_iterations     ; iterations smaller
+        sta _grd_num_colors
+_grd_nc_ok:
+
+    ;=======================================================================
+    ; Phase 1: Set up palette entries (only num_colors needed, max 16)
+    ;=======================================================================
+        lda _grd_num_colors
+        sec
+        sbc #1
+        bne +
+        lda #1
++       sta _grd_divisor
+
+        ; Red color step
+        lda _grd_del_r
+        sta _grd_div_num+1
+        lda #0
+        sta _grd_div_num
+        jsr _grd_div16x8
+        lda _grd_div_num
+        sta _grd_step_r
+        lda _grd_div_num+1
+        sta _grd_step_r+1
+
+        ; Green color step
+        lda _grd_del_g
+        sta _grd_div_num+1
+        lda #0
+        sta _grd_div_num
+        jsr _grd_div16x8
+        lda _grd_div_num
+        sta _grd_step_g
+        lda _grd_div_num+1
+        sta _grd_step_g+1
+
+        ; Blue color step
+        lda _grd_del_b
+        sta _grd_div_num+1
+        lda #0
+        sta _grd_div_num
+        jsr _grd_div16x8
+        lda _grd_div_num
+        sta _grd_step_b
+        lda _grd_div_num+1
+        sta _grd_step_b+1
+
+        ; Init color accumulators
+        lda #0
+        sta _grd_acc_r
+        sta _grd_acc_r+1
+        sta _grd_acc_g
+        sta _grd_acc_g+1
+        sta _grd_acc_b
+        sta _grd_acc_b+1
+        sta _grd_iter
+        sta _grd_iter+1
+
+        lda grad_pal
+        sta _grd_cur_pal
+
+;--- Palette setup loop ---
+_grd_pal_loop:
+        ; Compute red
+        lda _grd_dir_r
+        bmi +
+        clc
+        lda grad_r1
+        adc _grd_acc_r+1
+        jmp _grd_pr
++       sec
+        lda grad_r1
+        sbc _grd_acc_r+1
+_grd_pr:
+        sta _grd_cur_r
+
+        ; Compute green
+        lda _grd_dir_g
+        bmi +
+        clc
+        lda grad_g1
+        adc _grd_acc_g+1
+        jmp _grd_pg
++       sec
+        lda grad_g1
+        sbc _grd_acc_g+1
+_grd_pg:
+        sta _grd_cur_g
+
+        ; Compute blue
+        lda _grd_dir_b
+        bmi +
+        clc
+        lda grad_b1
+        adc _grd_acc_b+1
+        jmp _grd_pb
++       sec
+        lda grad_b1
+        sbc _grd_acc_b+1
+_grd_pb:
+        sta _grd_cur_b
+
+        ; Set palette entry
+        lda _grd_cur_pal
+        ldx _grd_cur_r
+        ldy _grd_cur_g
+        ldz _grd_cur_b
+        jsr set_palette_color
+
+        ; Advance color accumulators
+        clc
+        lda _grd_acc_r
+        adc _grd_step_r
+        sta _grd_acc_r
+        lda _grd_acc_r+1
+        adc _grd_step_r+1
+        sta _grd_acc_r+1
+
+        clc
+        lda _grd_acc_g
+        adc _grd_step_g
+        sta _grd_acc_g
+        lda _grd_acc_g+1
+        adc _grd_step_g+1
+        sta _grd_acc_g+1
+
+        clc
+        lda _grd_acc_b
+        adc _grd_step_b
+        sta _grd_acc_b
+        lda _grd_acc_b+1
+        adc _grd_step_b+1
+        sta _grd_acc_b+1
+
+        inc _grd_cur_pal
+        inc _grd_iter
+        lda _grd_iter
+        cmp _grd_num_colors
+        bne _grd_pal_loop
+
+    ;=======================================================================
+    ; Phase 2: Draw lines, mapping iterations to palette entries
+    ; Uses 16÷16 division since iterations can exceed 255
+    ;=======================================================================
+        ; pal_step = (num_colors - 1) * 256 / max(iterations - 1, 1)
+        lda _grd_num_colors
+        sec
+        sbc #1
+        sta _grd_div_num+1
+        lda #0
+        sta _grd_div_num
+
+        ; 16-bit: iterations - 1
+        lda _grd_iterations
+        sec
+        sbc #1
+        sta _grd_div16_den
+        lda _grd_iterations+1
+        sbc #0
+        sta _grd_div16_den+1
+        ; Clamp to 1 if zero
+        ora _grd_div16_den
+        bne +
+        lda #1
+        sta _grd_div16_den
++       jsr _grd_div16x16
+        lda _grd_div_num
+        sta _grd_step_pal
+        lda _grd_div_num+1
+        sta _grd_step_pal+1
+
+        ; Init draw loop
+        lda #0
+        sta _grd_acc_pal
+        sta _grd_acc_pal+1
+        sta _grd_iter
+        sta _grd_iter+1
+
+        ; Precompute endpoints
+        clc
+        lda grad_x
+        adc grad_w
+        sta _grd_x1
+        lda grad_x+1
+        adc grad_w+1
+        sta _grd_x1+1
+        lda _grd_x1
+        bne +
+        dec _grd_x1+1
++       dec _grd_x1             ; x1 = x + w - 1
+
+        clc
+        lda grad_y
+        adc grad_h
+        sec
+        sbc #1
+        sta _grd_y1             ; y1 = y + h - 1
+
+;--- Draw loop ---
+_grd_draw_loop:
+        ; palette entry = grad_pal + acc_pal.hi
+        clc
+        lda grad_pal
+        adc _grd_acc_pal+1
+        sta line_col
+
+        lda grad_dir
+        bne _grd_draw_hline
+
+        ; Horizontal gradient: vertical line at this column
+        clc
+        lda grad_x
+        adc _grd_iter
+        sta line_x0
+        lda grad_x+1
+        adc _grd_iter+1
+        sta line_x0+1
+        lda line_x0
+        sta line_x1
+        lda line_x0+1
+        sta line_x1+1
+        lda grad_y
+        sta line_y0
+        lda _grd_y1
+        sta line_y1
+        jmp _grd_draw_it
+
+_grd_draw_hline:
+        ; Vertical gradient: horizontal line at this row
+        lda grad_x
+        sta line_x0
+        lda grad_x+1
+        sta line_x0+1
+        lda _grd_x1
+        sta line_x1
+        lda _grd_x1+1
+        sta line_x1+1
+        clc
+        lda grad_y
+        adc _grd_iter           ; max 200 for vertical, fits in 8-bit
+        sta line_y0
+        sta line_y1
+
+_grd_draw_it:
+        jsr draw_line
+
+        ; Advance palette accumulator
+        clc
+        lda _grd_acc_pal
+        adc _grd_step_pal
+        sta _grd_acc_pal
+        lda _grd_acc_pal+1
+        adc _grd_step_pal+1
+        sta _grd_acc_pal+1
+
+        ; 16-bit increment and compare
+        inc _grd_iter
+        bne +
+        inc _grd_iter+1
++       lda _grd_iter
+        cmp _grd_iterations
+        bne _grd_draw_loop
+        lda _grd_iter+1
+        cmp _grd_iterations+1
+        bne _grd_draw_loop
+
+_grd_rts:
+        rts
+
+    ;---------------------------------------------------------------------------------------
+    ; 16-bit / 8-bit unsigned division
+    ; Input:  _grd_div_num (16-bit), _grd_divisor (8-bit)
+    ; Output: _grd_div_num (16-bit quotient)
+    ;---------------------------------------------------------------------------------------
+_grd_div16x8:
+        lda #0
+        sta _grd_div_rem
+        ldx #16
+-       asl _grd_div_num
+        rol _grd_div_num+1
+        rol _grd_div_rem
+        lda _grd_div_rem
+        cmp _grd_divisor
+        bcc +
+        sbc _grd_divisor
+        sta _grd_div_rem
+        inc _grd_div_num
++       dex
+        bne -
+        rts
+
+    ;---------------------------------------------------------------------------------------
+    ; 16-bit / 16-bit unsigned division
+    ; Input:  _grd_div_num (16-bit), _grd_div16_den (16-bit)
+    ; Output: _grd_div_num (16-bit quotient)
+    ;---------------------------------------------------------------------------------------
+_grd_div16x16:
+        lda #0
+        sta _grd_div_rem
+        sta _grd_div_rem+1
+        ldx #16
+-       asl _grd_div_num
+        rol _grd_div_num+1
+        rol _grd_div_rem
+        rol _grd_div_rem+1
+        sec
+        lda _grd_div_rem
+        sbc _grd_div16_den
+        tay
+        lda _grd_div_rem+1
+        sbc _grd_div16_den+1
+        bcc +
+        sta _grd_div_rem+1
+        sty _grd_div_rem
+        inc _grd_div_num
++       dex
+        bne -
+        rts
+
+    ;---------------------------------------------------------------------------------------
+    ; Working variables
+    ;---------------------------------------------------------------------------------------
+_grd_divisor:       .byte 0
+_grd_iterations:    .word 0
+_grd_num_colors:    .byte 0
+_grd_max_delta:     .byte 0
+_grd_iter:          .word 0
+_grd_cur_pal:       .byte 0
+_grd_x1:            .word 0
+_grd_y1:            .byte 0
+_grd_cur_r:         .byte 0
+_grd_cur_g:         .byte 0
+_grd_cur_b:         .byte 0
+_grd_del_r:         .byte 0
+_grd_del_g:         .byte 0
+_grd_del_b:         .byte 0
+_grd_dir_r:         .byte 0
+_grd_dir_g:         .byte 0
+_grd_dir_b:         .byte 0
+_grd_step_r:        .word 0
+_grd_step_g:        .word 0
+_grd_step_b:        .word 0
+_grd_step_pal:      .word 0
+_grd_acc_r:         .word 0
+_grd_acc_g:         .word 0
+_grd_acc_b:         .word 0
+_grd_acc_pal:       .word 0
+_grd_div_num:       .word 0
+_grd_div_rem:       .word 0
+_grd_div16_den:     .word 0

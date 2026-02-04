@@ -115,7 +115,7 @@ demo_text40:
         lda #$00                ; space
         jsr clear_screen_ram
 
-        jsr set_palette
+        jsr init_palette
 
         ; draw some custom chars
         lda #1
@@ -153,7 +153,7 @@ demo_text80:
 
         lda #MODE_TEXT80
         jsr set_screen_mode
-        jsr set_palette
+        jsr init_palette
 
         lda #$00                ; space
         jsr clear_screen_ram
@@ -346,9 +346,70 @@ _draw_colorful_lines:
         inc _cur_color
         lda _cur_x
         cmp #$ff
-        beq _loop
+        beq _grad
         inc _cur_x
         jmp _draw_colorful_lines
+
+_grad:
+        lda #0
+        sta grad_dir
+        lda #<200
+        sta grad_x
+        lda #>200
+        sta grad_x+1
+        lda #50
+        sta grad_y
+        lda #50
+        sta grad_w
+        lda #0
+        sta grad_w+1
+        lda #50
+        sta grad_h
+        lda #$0F                ; start: white (15,15,15)
+        sta grad_r1
+        sta grad_g1
+        sta grad_b1
+        lda #$0F                ; end: red (15,0,0)
+        sta grad_r2
+        lda #$00
+        sta grad_g2
+        sta grad_b2
+        lda #$80
+        sta grad_pal
+        jsr draw_gradient_rect
+
+        ; Vertical gradient: blue to green, top-to-bottom
+        lda #1                  ; vertical
+        sta grad_dir
+        lda #<100
+        sta grad_x
+        lda #>100
+        sta grad_x+1
+        lda #20
+        sta grad_y
+        lda #80
+        sta grad_w
+        lda #0
+        sta grad_w+1
+        lda #50
+        sta grad_h
+        lda #$00
+        sta grad_r1
+        sta grad_r2
+        lda #$00
+        sta grad_g1
+        lda #$0F
+        sta grad_g2
+        lda #$0F
+        sta grad_b1
+        lda #$00
+        sta grad_b2
+        lda #$C0
+        sta grad_pal
+        jsr draw_gradient_rect
+        
+
+_grad_done:
 
 _loop:
         jsr $FFE4
@@ -522,9 +583,99 @@ _draw_colorful_lines:
         inc _cur_color
         lda _cur_x
         cmp #$ff
-        beq _loop
+        beq _grad
         inc _cur_x
         jmp _draw_colorful_lines
+
+_grad:
+        lda #0
+        sta grad_dir
+        lda #<200
+        sta grad_x
+        lda #>200
+        sta grad_x+1
+        lda #50
+        sta grad_y
+        lda #50
+        sta grad_w
+        lda #0
+        sta grad_w+1
+        lda #50
+        sta grad_h
+        lda #$0F                ; start: white (15,15,15)
+        sta grad_r1
+        sta grad_g1
+        sta grad_b1
+        lda #$0F                ; end: blue (0,0,15)
+        sta grad_b2
+        lda #$00
+        sta grad_g2
+        sta grad_r2
+        lda #$80
+        sta grad_pal
+        jsr draw_gradient_rect
+
+        ; Vertical gradient: blue to green, top-to-bottom
+        lda #1                  ; vertical
+        sta grad_dir
+        lda #<100
+        sta grad_x
+        lda #>100
+        sta grad_x+1
+        lda #20
+        sta grad_y
+        lda #80
+        sta grad_w
+        lda #0
+        sta grad_w+1
+        lda #50
+        sta grad_h
+        lda #$00
+        sta grad_r1
+        sta grad_r2
+        lda #$00
+        sta grad_g1
+        lda #$0F
+        sta grad_g2
+        lda #$0F
+        sta grad_b1
+        lda #$00
+        sta grad_b2
+        lda #$C0
+        sta grad_pal
+        jsr draw_gradient_rect
+
+_loop_ending:
+        jsr $FFE4
+        cmp #' '
+        bne _loop_ending
+
+        ; Full-screen white to red gradient
+        lda #0
+        sta grad_x
+        sta grad_x+1
+        sta grad_y
+        sta grad_dir            ; horizontal
+        lda #<640
+        sta grad_w
+        lda #>640
+        sta grad_w+1            ; must set both bytes!
+        lda #200
+        sta grad_h
+        lda #$0F
+        sta grad_r1
+        sta grad_g1
+        sta grad_b1             ; white (15,15,15)
+        lda #$0F
+        sta grad_r2
+        lda #$00
+        sta grad_g2
+        sta grad_b2             ; red (15,0,0)
+        lda #$80
+        sta grad_pal
+        jsr draw_gradient_rect
+
+_grad_done:
 
 _loop:
         jsr $FFE4

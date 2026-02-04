@@ -155,7 +155,7 @@ _dc_not_80:
         sta PTR+3
         
         ; Write screen code: CHAR_DATA/64 + char_index
-        ; CHAR_DATA = $50000, so $50000/64 = $1400
+        ; CHAR_DATA = $40000, so $40000/64 = $1000
         ldz #0
         lda _dc_char
         clc
@@ -674,7 +674,7 @@ clear_color_ram_text:
         sta $D707
         .byte $0b                ; use 11-byte F018 list format 
         .byte $81, $FF           ; destination address bits 20–27 (MB select) :contentReference[oaicite:5]{index=5}
-        .byte $85, $02           ; dest skip whole = 2 bytes (every other byte) :contentReference[oaicite:7]{index=7}
+        ;.byte $85, $02           ; dest skip whole = 2 bytes (every other byte) :contentReference[oaicite:7]{index=7}
         .byte $00                ; end of option list :contentReference[oaicite:8]{index=8}
 
         .byte $03               ; fill command
@@ -707,28 +707,7 @@ _ccrt_fill_val:
 
         rts
 
-;===========================================================================================
-; sets the palette of colors
-; $00 is always transparent
-; $FF is special and is foreground color
-;
-;       $D100-$D1FF : red
-;       $D200-$D2FF : green
-;       $D300-$D3FF : blue
-;
-; load a color from $00-$FF into A
-; then STA to the RGB color registers, 
-; EXCEPT +$00 (always transparent) or +$FF (always color RAM foreground)
-;===========================================================================================
-set_palette:
-        ; establish the color BLACK
-        ; $AA is picked abritrarily to stand out in the character definition below
-        lda #$00
-        sta $D100+$AA           ; $AA in char data for RED is set to $00
-        sta $D200+$AA           ; $AA in char data for RED is set to $00
-        sta $D200+$AA           ; $AA in char data for RED is set to $00
 
-        rts
 
 ;===========================================================================================
 ; CUSTOM CHARACTER DEFINITIONS
