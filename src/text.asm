@@ -778,6 +778,95 @@ block:
 .byte $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA
 .byte $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA
 
+folder_tl:                                      ; char 6
+.byte $00,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$A1
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$AA,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$A1
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+
+folder_tc:                                      ; char 7
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $AA,$00,$00,$00,$00,$00,$00,$00
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+.byte $A1,$A1,$A1,$A1,$A1,$A1,$A1,$A1
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$A1
+.byte $A3,$A3,$A3,$A3,$A4,$A4,$AA,$A1
+.byte $A3,$A3,$A3,$A3,$A3,$A4,$AA,$A1
+.byte $A3,$A3,$A3,$A3,$A3,$A3,$AA,$A1
+
+folder_tr:                                      ; char 8
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $AA,$AA,$AA,$AA,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+
+folder_ml:                                      ; char 9
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+.byte $AA,$A1,$A1,$A1,$A1,$A1,$A1,$AA
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+
+folder_mc:                                      ; char 10
+.byte $A3,$A3,$A3,$A3,$A3,$A3,$AA,$A1
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$A1
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+
+folder_mr:                                      ; char 11
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $A1,$A1,$A1,$A1,$AA,$00,$00,$00
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+
+folder_bl:                                      ; char 12
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $00,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+
+folder_bc:                                      ; char 13
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $A2,$A2,$A2,$A2,$A2,$A2,$A2,$A2
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+
+folder_br:                                      ; char 14
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $A2,$A2,$A2,$A2,$A2,$AA,$00,$00
+.byte $AA,$AA,$AA,$AA,$AA,$AA,$00,$00
 
 
 custom_chars_end:

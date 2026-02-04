@@ -366,6 +366,11 @@ init_palette:
         sta $D200+$AA           ; $AA in char data for RED is set to $00
         sta $D300+$AA           ; $AA in char data for RED is set to $00
 
+        lda #$09
+        sta $D100+$BB
+        sta $D200+$BB
+        sta $D300+$BB
+
         rts
 
 ;=======================================================================================
