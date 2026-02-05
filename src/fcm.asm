@@ -255,20 +255,24 @@ _ssm_screen_off:
 ; Exit to BASIC mode
 ;---------------------------------------------------------------------------------------
 _ssm_exit_basic:
-        ; Keep VIC-IV enabled
+        ; Enable VIC-IV
         lda #$47
         sta VIC4_KEY
         lda #$53
         sta VIC4_KEY
 
-        ; Disable FCM/SEAM
+        ; Re-enable hot registers FIRST
+        lda #$80
+        tsb $D05D
+
+        ; NOW disable FCM/SEAM (with hot registers on, write sticks)
         lda #$00
         sta VIC4_CTRL
 
         ; Restore VIC3_CTRL - clear ATTR, set H640
         lda VIC3_CTRL
-        ora #%10000000          ; Set H640
-        and #%11011111          ; Clear ATTR
+        ora #%10000000
+        and #%11011111
         sta VIC3_CTRL
 
         ; Restore LINESTEP
@@ -290,6 +294,18 @@ _ssm_exit_basic:
         sta VIC4_SCRBPTRBNK
         stz $D063
 
+        ; Restore CHARPTR to ROM charset ($2D000)
+        lda #$00
+        sta $D068
+        lda #$D0
+        sta $D069
+        lda #$02
+        sta $D06A
+
+        ; Restore DISPROWS
+        lda #25
+        sta VIC4_DISPROWS
+
         ; Restore text position
         lda #$50
         sta VIC4_TEXTXPOS
@@ -303,23 +319,25 @@ _ssm_exit_basic:
         sta BORDERCOL
         sta BACKCOL
 
-        ; DMA: Reset color RAM to green ($05) for BASIC
-        ; Reset both MBs explicitly for clean KERNAL handoff
+        ; DMA: Reset color RAM
         lda #$00
         sta $D707
-        .byte $80, $00          ; source MB = $00
-        .byte $81, $FF          ; dest MB = $FF (color RAM)
-        .byte $00               ; end options
-        .byte $03               ; fill
-        .word 5632              ; count
-        .byte $05, $00          ; fill value = $05 (green)
-        .byte $00               ; src bank
-        .word $0000             ; dest = $FF80000
-        .byte $08               ; dest bank ($F8 in MB $FF)
-        .byte $00               ; cmd high
-        .word $0000             ; modulo
+        .byte $80, $00
+        .byte $81, $FF
+        .byte $00
+        .byte $03
+        .word 5632
+        .byte $05, $00
+        .byte $00
+        .word $0000
+        .byte $08
+        .byte $00
+        .word $0000
 
+        ; CINT + clear screen
         jsr $FF81
+        jsr $FF84
+
         rts
 
 _ssm_mode: .byte 0

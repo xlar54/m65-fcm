@@ -2,6 +2,7 @@
 ; draw_polygon - Draw a regular polygon (outline or filled)
 ; Input: poly_cx (16-bit), poly_cy (8-bit), poly_r (8-bit), poly_col (8-bit)
 ;        poly_sides (8-bit, must be 3-32)
+;        poly_grad (8-bit): 0 = flat color, nonzero = use gradient lookup
 ;        Carry: clear=outline, set=filled
 ; Automatically doubles x offsets in 80-col mode for correct aspect ratio
 ; First vertex points up (12 o'clock position)
@@ -11,24 +12,23 @@ poly_cy:    .byte 0
 poly_r:     .byte 0
 poly_col:   .byte 0
 poly_sides: .byte 0
+poly_grad:  .byte 0             ; 0=flat, nonzero=gradient
 
 draw_polygon:
-        ; Save fill flag from carry FIRST (before any CMP trashes it)
+        ; Save fill flag from carry FIRST
         lda #0
         rol
         sta _pg_fill
 
-        ; Now validate sides (3-32)
+        ; Validate sides (3-32)
         lda poly_sides
         cmp #3
         bcc _pg_exit
         cmp #33
         bcs _pg_exit
 
-        ; Compute all vertex positions
         jsr _pg_calc_vertices
 
-        ; Draw outline or filled
         lda _pg_fill
         bne +
         jsr _pg_draw_outline
@@ -39,39 +39,34 @@ _pg_exit:
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_calc_vertices - Compute vertex positions using sine/cosine lookup
-; For vertex i: angle = i * 256 / sides - 64 (rotated so vertex 0 is at top)
-;   vx[i] = cx + r * cos(angle)    (with aspect ratio correction in 80-col)
-;   vy[i] = cy + r * sin(angle)    (clamped to 0-199)
+; _pg_calc_vertices (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_calc_vertices:
         lda #0
         sta _pg_cur_vertex
 
 _pg_vert_loop:
-        ; --- Compute angle = cur_vertex * 256 / sides - 64 ---
         lda _pg_cur_vertex
-        sta _pg_div_num+1       ; vertex_idx in high byte = idx * 256
+        sta _pg_div_num+1
         lda #0
         sta _pg_div_num
         lda poly_sides
         sta _pg_divisor
         jsr _pg_div16x8
-        lda _pg_div_num         ; angle (0-255)
+        lda _pg_div_num
         sec
-        sbc #64                 ; rotate -90° so vertex 0 points up (12 o'clock)
-        sta _pg_cur_angle       ; wraps naturally in 8-bit unsigned
+        sbc #64
+        sta _pg_cur_angle
 
-        ; --- X offset: r * cos(angle) ---
+        ; X offset: r * cos(angle)
         clc
         lda _pg_cur_angle
-        adc #64                 ; cos = sin(angle + 64)
-        jsr _pg_get_sin         ; A = |sin|, _pg_sin_neg = sign
+        adc #64
+        jsr _pg_get_sin
 
         ldx poly_r
-        jsr _pg_mul8x8          ; _pg_mul_result+1 = r * |cos| / 256
+        jsr _pg_mul8x8_hw
 
-        ; Apply aspect ratio doubling for 80-col
         lda _pg_mul_result+1
         sta _pg_offset
         lda #0
@@ -83,7 +78,6 @@ _pg_vert_loop:
         asl _pg_offset
         rol _pg_offset+1
 +
-        ; vx = cx +/- offset
         lda _pg_sin_neg
         bne _pg_vx_sub
 
@@ -104,28 +98,25 @@ _pg_vx_sub:
         lda poly_cx+1
         sbc _pg_offset+1
         sta _pg_tmp_vx+1
-        ; Clamp to 0 if negative
         bpl _pg_do_vy
         lda #0
         sta _pg_tmp_vx
         sta _pg_tmp_vx+1
 
 _pg_do_vy:
-        ; --- Y offset: r * sin(angle) ---
         lda _pg_cur_angle
         jsr _pg_get_sin
 
         ldx poly_r
-        jsr _pg_mul8x8
+        jsr _pg_mul8x8_hw
 
-        ; vy = cy +/- offset (clamped to 0-199)
         lda _pg_sin_neg
         bne _pg_vy_sub
 
         clc
         lda poly_cy
         adc _pg_mul_result+1
-        bcs _pg_vy_clamp_hi     ; 8-bit overflow -> clamp
+        bcs _pg_vy_clamp_hi
         cmp #200
         bcc _pg_store_vert
 _pg_vy_clamp_hi:
@@ -136,15 +127,12 @@ _pg_vy_sub:
         sec
         lda poly_cy
         sbc _pg_mul_result+1
-        bcs _pg_store_vert      ; no underflow, value is valid
-        lda #0                  ; underflow -> clamp to 0
+        bcs _pg_store_vert
+        lda #0
 
 _pg_store_vert:
-        ; Store Y coordinate
         ldx _pg_cur_vertex
         sta _pg_vy,x
-
-        ; Store X coordinate (word array, index = vertex * 2)
         txa
         asl
         tax
@@ -153,7 +141,6 @@ _pg_store_vert:
         lda _pg_tmp_vx+1
         sta _pg_vx+1,x
 
-        ; Next vertex
         inc _pg_cur_vertex
         lda _pg_cur_vertex
         cmp poly_sides
@@ -162,9 +149,7 @@ _pg_store_vert:
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_get_sin - Quarter-sine lookup with quadrant handling
-; Input:  A = angle (0-255, where 256 = full circle)
-; Output: A = |sin(angle)| (0-255), _pg_sin_neg = 0 if positive, $FF if negative
+; _pg_get_sin (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_get_sin:
         sta _pg_sin_angle
@@ -175,20 +160,17 @@ _pg_get_sin:
         cmp #128
         bcc _pg_sin_pos_half
 
-        ; Angles 128-255: sin is negative
         lda #$FF
         sta _pg_sin_neg
         lda _pg_sin_angle
-        and #$7F                ; map 128-255 -> 0-127
+        and #$7F
         sta _pg_sin_angle
 
 _pg_sin_pos_half:
-        ; Angle is now 0-127
         lda _pg_sin_angle
         cmp #64
         bcc _pg_sin_q1
 
-        ; Q2 (64-127): mirror using table[128-angle]
         lda #128
         sec
         sbc _pg_sin_angle
@@ -197,14 +179,13 @@ _pg_sin_pos_half:
         rts
 
 _pg_sin_q1:
-        ; Q1 (0-63): direct lookup
         tax
         lda _pg_sin_table,x
         rts
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_draw_outline - Draw lines between consecutive vertices
+; _pg_draw_outline (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_draw_outline:
         lda poly_col
@@ -214,7 +195,6 @@ _pg_draw_outline:
         sta _pg_edge_idx
 
 _pg_ol_loop:
-        ; Start vertex = edge_idx
         ldx _pg_edge_idx
         lda _pg_vy,x
         sta line_y0
@@ -226,7 +206,6 @@ _pg_ol_loop:
         lda _pg_vx+1,x
         sta line_x0+1
 
-        ; End vertex = (edge_idx + 1) % sides
         ldx _pg_edge_idx
         inx
         cpx poly_sides
@@ -252,16 +231,10 @@ _pg_ol_loop:
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_draw_filled - Convex polygon scanline fill
-; For each scanline Y from min_vy to max_vy:
-;   Find leftmost and rightmost edge intersection X
-;   Draw horizontal line between them
+; _pg_draw_filled - Scanline fill with gradient support
 ;---------------------------------------------------------------------------------------
 _pg_draw_filled:
-        lda poly_col
-        sta line_col
-
-        ; Find min_y and max_y across all vertices
+        ; Find min_y and max_y
         lda #199
         sta _pg_min_y
         lda #0
@@ -281,32 +254,27 @@ _pg_find_yrange:
         cpx poly_sides
         bne _pg_find_yrange
 
-        ; Clamp max_y to 199
         lda _pg_max_y
         cmp #200
         bcc +
         lda #199
         sta _pg_max_y
 +
-        ; Scanline loop: min_y to max_y inclusive
         lda _pg_min_y
         sta _pg_scan_y
 
 _pg_scan_loop:
-        ; Init min/max X for this scanline
         lda #$FF
         sta _pg_min_sx
-        sta _pg_min_sx+1        ; min starts at $FFFF
+        sta _pg_min_sx+1
         lda #0
         sta _pg_max_sx
-        sta _pg_max_sx+1        ; max starts at $0000
+        sta _pg_max_sx+1
 
-        ; Test each edge for intersection
         lda #0
         sta _pg_edge_idx
 
 _pg_edge_test:
-        ; Load vertex i
         ldx _pg_edge_idx
         lda _pg_vy,x
         sta _pg_vy0
@@ -318,7 +286,6 @@ _pg_edge_test:
         lda _pg_vx+1,x
         sta _pg_vx0+1
 
-        ; Load vertex (i+1) % sides
         ldx _pg_edge_idx
         inx
         cpx poly_sides
@@ -334,13 +301,12 @@ _pg_edge_test:
         lda _pg_vx+1,x
         sta _pg_vx1+1
 
-        ; Orient edge so vy0 <= vy1
         lda _pg_vy0
         cmp _pg_vy1
-        bcc _pg_edge_oriented   ; vy0 < vy1, OK
-        beq _pg_edge_next       ; horizontal edge, skip
+        bcc _pg_edge_oriented
+        beq _pg_edge_next
 
-        ; Swap endpoints
+        ; Swap
         lda _pg_vx0
         ldy _pg_vx1
         sty _pg_vx0
@@ -355,18 +321,15 @@ _pg_edge_test:
         sta _pg_vy1
 
 _pg_edge_oriented:
-        ; Check scan_y in [vy0, vy1]
         lda _pg_scan_y
         cmp _pg_vy0
-        bcc _pg_edge_next       ; scan_y < vy0
+        bcc _pg_edge_next
         lda _pg_vy1
         cmp _pg_scan_y
-        bcc _pg_edge_next       ; vy1 < scan_y
+        bcc _pg_edge_next
 
-        ; Compute intersection X at this scanline
         jsr _pg_calc_intersect
 
-        ; Clamp negative X to 0
         lda _pg_ix+1
         bpl _pg_ix_nonneg
         lda #0
@@ -374,14 +337,13 @@ _pg_edge_oriented:
         sta _pg_ix+1
 _pg_ix_nonneg:
 
-        ; Update min_sx (unsigned 16-bit compare)
         lda _pg_ix+1
         cmp _pg_min_sx+1
-        bcc _pg_do_update_min   ; ix.hi < min.hi
-        bne _pg_check_max       ; ix.hi > min.hi
+        bcc _pg_do_update_min
+        bne _pg_check_max
         lda _pg_ix
         cmp _pg_min_sx
-        bcs _pg_check_max       ; ix.lo >= min.lo
+        bcs _pg_check_max
 
 _pg_do_update_min:
         lda _pg_ix
@@ -390,15 +352,14 @@ _pg_do_update_min:
         sta _pg_min_sx+1
 
 _pg_check_max:
-        ; Update max_sx
         lda _pg_ix+1
         cmp _pg_max_sx+1
-        bcc _pg_edge_next       ; ix.hi < max.hi
-        bne _pg_do_update_max   ; ix.hi > max.hi
+        bcc _pg_edge_next
+        bne _pg_do_update_max
         lda _pg_ix
         cmp _pg_max_sx
-        bcc _pg_edge_next       ; ix.lo < max.lo
-        beq _pg_edge_next       ; ix.lo = max.lo
+        bcc _pg_edge_next
+        beq _pg_edge_next
 
 _pg_do_update_max:
         lda _pg_ix
@@ -412,17 +373,28 @@ _pg_edge_next:
         cmp poly_sides
         bne _pg_edge_test
 
-        ; Draw horizontal line if valid intersection found
+        ; Draw hline if valid
         lda _pg_min_sx+1
         cmp _pg_max_sx+1
-        bcc _pg_do_hline        ; min.hi < max.hi
-        bne _pg_scan_next       ; min.hi > max.hi, skip
+        bcc _pg_do_hline
+        bne _pg_scan_next
         lda _pg_min_sx
         cmp _pg_max_sx
-        beq _pg_do_hline        ; equal = single pixel
-        bcs _pg_scan_next       ; min.lo > max.lo, skip
+        beq _pg_do_hline
+        bcs _pg_scan_next
 
 _pg_do_hline:
+        ; --- Gradient-aware color selection ---
+        lda poly_grad
+        beq _pg_flat_col
+        lda _pg_scan_y
+        jsr grad_get_color
+        sta line_col
+        jmp _pg_do_draw
+_pg_flat_col:
+        lda poly_col
+        sta line_col
+_pg_do_draw:
         lda _pg_min_sx
         sta line_x0
         lda _pg_min_sx+1
@@ -434,12 +406,12 @@ _pg_do_hline:
         lda _pg_scan_y
         sta line_y0
         sta line_y1
-        jsr draw_line
+        jsr fill_hline
 
 _pg_scan_next:
         lda _pg_scan_y
         cmp _pg_max_y
-        bcs _pg_fill_done       ; scan_y >= max_y, done
+        bcs _pg_fill_done
         inc _pg_scan_y
         jmp _pg_scan_loop
 
@@ -448,31 +420,24 @@ _pg_fill_done:
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_calc_intersect - Compute X intersection of an edge with a scanline
-; Input:  _pg_vx0/vy0, _pg_vx1/vy1 (oriented so vy0 <= vy1), _pg_scan_y
-; Output: _pg_ix (16-bit X)
-; Method: x = vx0 + (scan_y - vy0) * (vx1 - vx0) / (vy1 - vy0)
-;         Uses fractional interpolation to avoid large intermediates
+; _pg_calc_intersect (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_calc_intersect:
-        ; t = scan_y - vy0
         sec
         lda _pg_scan_y
         sbc _pg_vy0
         sta _pg_t
-        beq _pg_ix_v0           ; t=0 -> x = vx0
+        beq _pg_ix_v0
 
-        ; dy = vy1 - vy0
         sec
         lda _pg_vy1
         sbc _pg_vy0
         sta _pg_dy
         cmp _pg_t
-        beq _pg_ix_v1           ; t=dy -> x = vx1
+        beq _pg_ix_v1
 
-        ; frac = t * 256 / dy  (0-255 representing 0.0 to ~1.0)
         lda _pg_t
-        sta _pg_div_num+1       ; t in high byte = t * 256
+        sta _pg_div_num+1
         lda #0
         sta _pg_div_num
         lda _pg_dy
@@ -481,7 +446,6 @@ _pg_calc_intersect:
         lda _pg_div_num
         sta _pg_frac
 
-        ; dx = vx1 - vx0 (signed 16-bit)
         sec
         lda _pg_vx1
         sbc _pg_vx0
@@ -490,13 +454,11 @@ _pg_calc_intersect:
         sbc _pg_vx0+1
         sta _pg_dx+1
 
-        ; Get |dx| and remember sign
         lda #0
         sta _pg_dx_neg
         lda _pg_dx+1
         bpl _pg_dx_pos
 
-        ; Negate dx
         lda #$FF
         sta _pg_dx_neg
         sec
@@ -508,22 +470,16 @@ _pg_calc_intersect:
         sta _pg_dx+1
 
 _pg_dx_pos:
-        ; offset = |dx| * frac / 256
-        ;        = (dx_hi * frac) + (dx_lo * frac) >> 8
-
-        ; Low part: (dx_lo * frac) >> 8
         lda _pg_dx
         ldx _pg_frac
-        jsr _pg_mul8x8
-        lda _pg_mul_result+1    ; high byte of product
+        jsr _pg_mul8x8_hw
+        lda _pg_mul_result+1
         sta _pg_offset
 
-        ; High part: dx_hi * frac (full 16-bit)
         lda _pg_dx+1
         ldx _pg_frac
-        jsr _pg_mul8x8
+        jsr _pg_mul8x8_hw
 
-        ; Combine: offset = high_part + low_part_hi
         clc
         lda _pg_offset
         adc _pg_mul_result
@@ -532,7 +488,6 @@ _pg_dx_pos:
         adc #0
         sta _pg_offset+1
 
-        ; Apply sign: ix = vx0 +/- offset
         lda _pg_dx_neg
         bne _pg_ix_sub
 
@@ -571,9 +526,7 @@ _pg_ix_v1:
 
 
 ;---------------------------------------------------------------------------------------
-; _pg_mul8x8 - Unsigned 8x8 -> 16-bit multiply
-; Input:  A = multiplicand, X = multiplier
-; Output: _pg_mul_result (16-bit, +1 = high byte)
+; _pg_mul8x8 (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_mul8x8:
         sta _pg_mul_a
@@ -594,11 +547,31 @@ _pg_mul8x8:
         bne -
         rts
 
-
+; --- hardware accelerated
+_pg_mul8x8_hw:
+        ; Input: A = multiplicand, X = multiplier
+        sta $D770
+        lda #0
+        sta $D771
+        sta $D772
+        sta $D773
+        
+        stx $D774
+        lda #0
+        sta $D775
+        sta $D776
+        sta $D777
+        
+        ; No wait needed - multiplier is instant!
+        ; (MULBUSY never sets according to docs)
+        
+        lda $D778               ; Result low byte
+        sta _pg_mul_result
+        lda $D779               ; Result high byte
+        sta _pg_mul_result+1
+        rts
 ;---------------------------------------------------------------------------------------
-; _pg_div16x8 - 16-bit / 8-bit unsigned division
-; Input:  _pg_div_num (16-bit), _pg_divisor (8-bit)
-; Output: _pg_div_num (16-bit quotient)
+; _pg_div16x8 (unchanged)
 ;---------------------------------------------------------------------------------------
 _pg_div16x8:
         lda #0
@@ -619,9 +592,7 @@ _pg_div16x8:
 
 
 ;---------------------------------------------------------------------------------------
-; Quarter-sine lookup table (65 entries: indices 0-64)
-; _pg_sin_table[i] = round(sin(i * pi / 128) * 255)
-; Covers 0 to 90 degrees; full circle handled by quadrant mirroring in _pg_get_sin
+; Sine table
 ;---------------------------------------------------------------------------------------
 _pg_sin_table:
         .byte   0,   6,  13,  19,  25,  31,  37,  44
@@ -632,8 +603,7 @@ _pg_sin_table:
         .byte 212, 215, 219, 222, 225, 228, 231, 233
         .byte 236, 238, 240, 242, 244, 246, 247, 249
         .byte 250, 251, 252, 253, 254, 254, 255, 255
-        .byte 255                                       ; entry 64 = sin(90)
-
+        .byte 255
 
 ;---------------------------------------------------------------------------------------
 ; Working variables
