@@ -71,6 +71,9 @@ main:
         jsr demo_text80
         jsr demo_bitmap40
         jsr demo_bitmap80
+        jsr demo_solar
+
+        jsr WAIT_SPACEBAR
 
         lda #MODE_BASIC         ; Return to BASIC mode
         jsr set_screen_mode
@@ -88,10 +91,19 @@ msg3:
 msg_space:
         .text "SPACE BAR to next demo screen",$00
 
+WAIT_SPACEBAR:
+        jsr $FFE4
+        cmp #' '
+        bne WAIT_SPACEBAR
+        rts
+
 
 .include "fcm.asm"
 .include "text.asm"
 .include "bitmap.asm"
+.include "ellipse.asm"
+.include "polygon.asm"
+.include "solar.asm"
 
 demo_text40:
         lda #MODE_TEXT40
@@ -212,11 +224,7 @@ demo_text40:
         ldy #7
         jsr draw_char
 
-        
-_loop:
-        jsr $FFE4
-        cmp #' '
-        bne _loop
+        jsr WAIT_SPACEBAR
 
         rts
 
@@ -339,10 +347,7 @@ demo_text80:
         ldy #7
         jsr draw_char
 
-_loop:
-        jsr $FFE4
-        cmp #' '
-        bne _loop
+        jsr WAIT_SPACEBAR
 
         rts
 
@@ -486,6 +491,23 @@ demo_bitmap40:
         sec                     ; Filled
         jsr draw_circle
 
+        ; ellipse
+        ; Filled ellipse
+        lda #<400
+        sta elip_cx
+        lda #>400
+        sta elip_cx+1
+        lda #80
+        sta elip_cy
+        lda #20
+        sta elip_rx
+        lda #50             ; tall
+        sta elip_ry
+        lda #$08
+        sta elip_col
+        sec
+        jsr draw_ellipse
+
         ; Draw vertical lines showing predefined palette colors
         lda #$01                ; start at 1 (skip $00 = transparent)
         sta _cur_color
@@ -578,10 +600,43 @@ _grad:
 
 _grad_done:
 
-_loop:
-        jsr $FFE4
-        cmp #' '
-        bne _loop
+_polygon_start:
+
+        ; Filled hexagon at (120, 80) radius 35
+        lda #<280
+        sta poly_cx
+        lda #>280
+        sta poly_cx+1
+        lda #70
+        sta poly_cy
+        lda #35
+        sta poly_r
+        lda #5
+        sta poly_sides
+        lda #$05            ; color
+        sta poly_col
+        sec                 ; Filled
+        jsr draw_polygon
+
+        ; Filled hexagon at (120, 80) radius 35
+        lda #<285
+        sta poly_cx
+        lda #>285
+        sta poly_cx+1
+        lda #70
+        sta poly_cy
+        lda #30
+        sta poly_r
+        lda #4
+        sta poly_sides
+        lda #$08            ; color
+        sta poly_col
+        sec                 ; Filled
+        jsr draw_polygon
+
+_polygon_end:
+
+        jsr WAIT_SPACEBAR
 
         rts
 
@@ -823,10 +878,43 @@ _grad:
         sta grad_pal
         jsr draw_gradient_rect
 
-_loop_ending:
-        jsr $FFE4
-        cmp #' '
-        bne _loop_ending
+        jsr WAIT_SPACEBAR
+
+_polygon_start:
+
+        ; Filled hexagon at (120, 80) radius 35
+        lda #<280
+        sta poly_cx
+        lda #>280
+        sta poly_cx+1
+        lda #70
+        sta poly_cy
+        lda #35
+        sta poly_r
+        lda #5
+        sta poly_sides
+        lda #$05            ; color
+        sta poly_col
+        sec                 ; Filled
+        jsr draw_polygon
+
+        ; Filled hexagon at (120, 80) radius 35
+        lda #<285
+        sta poly_cx
+        lda #>285
+        sta poly_cx+1
+        lda #70
+        sta poly_cy
+        lda #30
+        sta poly_r
+        lda #3
+        sta poly_sides
+        lda #$08            ; color
+        sta poly_col
+        sec                 ; Filled
+        jsr draw_polygon
+
+_polygon_end:
 
         ; Full-screen white to red gradient
         lda #0
@@ -854,16 +942,13 @@ _loop_ending:
         jsr draw_gradient_rect
 
 _grad_done:
-
-_loop:
-        jsr $FFE4
-        cmp #' '
-        bne _loop
-
+        jsr WAIT_SPACEBAR
         rts
 
 _cur_color:
         .byte $00
 _cur_x:
         .byte 50
+
+
 
