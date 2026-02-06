@@ -1,8 +1,6 @@
 ;=======================================================================================
 ; demo_cube.asm - Rotating 3D wireframe cube for MEGA65
 ;
-; ALL math in software - no hardware multiplier/divider used.
-; Uses shift-and-add for 8x8 signed multiply.
 ; Uses reciprocal lookup table for perspective (no division).
 ; Syncs to vblank to avoid flicker.
 ;=======================================================================================
@@ -46,10 +44,13 @@ _dc_mainloop:
         cmp #' '
         beq _dc_quit
 
-        ; Wait for vblank (raster line >= 200)
--       lda $D012
-        cmp #210
-        bcc -
+        ; Wait for vblank using $D011 bit 7 (raster MSB)
+        ; First wait for raster to enter vblank (bit 7 set = line >= 256)
+-       bit $D011
+        bpl -
+        ; Then wait for it to exit (bit 7 clear = new frame starting)
+-       bit $D011
+        bmi -
 
         ; Erase old edges
         jsr _dc_erase
