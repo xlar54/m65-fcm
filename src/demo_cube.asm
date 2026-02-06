@@ -1,6 +1,8 @@
 ;=======================================================================================
 ; demo_cube.asm - Rotating 3D wireframe cube for MEGA65
 ;
+; ALL math in software - no hardware multiplier/divider used.
+; Uses shift-and-add for 8x8 signed multiply.
 ; Uses reciprocal lookup table for perspective (no division).
 ; Syncs to vblank to avoid flicker.
 ;=======================================================================================
@@ -25,35 +27,13 @@ demo_cube:
         sta _dc_aX
         sta _dc_aY
 
-        ; Initial transform
+        ; Do initial transform so first frame draws correctly
         jsr _dc_xform
-        ; Copy current -> old
-        ldx #(N_VERT*2)-1
--       lda _dc_scx,x
-        sta _dc_ocx,x
-        dex
-        bpl -
-        ldx #N_VERT-1
--       lda _dc_scy,x
-        sta _dc_ocy,x
-        dex
-        bpl -
 
 _dc_mainloop:
         jsr $FFE4
         cmp #' '
         beq _dc_quit
-
-        ; Wait for vblank using $D011 bit 7 (raster MSB)
-        ; First wait for raster to enter vblank (bit 7 set = line >= 256)
--       bit $D011
-        bpl -
-        ; Then wait for it to exit (bit 7 clear = new frame starting)
--       bit $D011
-        bmi -
-
-        ; Erase old edges
-        jsr _dc_erase
 
         ; Advance angles
         clc
@@ -68,20 +48,22 @@ _dc_mainloop:
         ; Transform + project
         jsr _dc_xform
 
-        ; Draw new edges
-        jsr _dc_draw
+        ; Wait for vblank - two stage to avoid re-trigger
+        ; Stage 1: Wait until raster is in visible area (< 250)
+-       lda $D012
+        cmp #250
+        bcs -
+        ; Stage 2: Wait until raster passes line 250 (entering border/vblank)
+-       lda $D012
+        cmp #250
+        bcc -
 
-        ; Copy current -> old
-        ldx #(N_VERT*2)-1
--       lda _dc_scx,x
-        sta _dc_ocx,x
-        dex
-        bpl -
-        ldx #N_VERT-1
--       lda _dc_scy,x
-        sta _dc_ocy,x
-        dex
-        bpl -
+        ; DMA clear entire bitmap (nearly instant)
+        lda #$00
+        jsr clear_bitmap
+
+        ; Draw new edges (green)
+        jsr _dc_draw
 
         jmp _dc_mainloop
 
@@ -104,86 +86,43 @@ _dc_e1: .byte 1,2,3,0, 5,6,7,4, 4,5,6,7
 ; Screen coords
 _dc_scx: .fill N_VERT*2, 0     ; 16-bit screen X
 _dc_scy: .fill N_VERT, 0       ; 8-bit screen Y
-_dc_ocx: .fill N_VERT*2, 0     ; old screen X
-_dc_ocy: .fill N_VERT, 0       ; old screen Y
 
 ;=======================================================================================
-; _dc_erase / _dc_draw - Draw all edges in black / green
+; _dc_draw - Draw all 12 edges in green
 ;=======================================================================================
-_dc_erase:
-        lda #$00
-        sta _dc_lcol
-        lda #1
-        sta _dc_use_old
-        jmp _dc_draw_edges
-
 _dc_draw:
-        lda #$0D
-        sta _dc_lcol
-        lda #0
-        sta _dc_use_old
-
-_dc_draw_edges:
         ldx #0
 _dc_de_lp:
         stx _dc_eidx
 
-        ; Vertex indices
         lda _dc_e0,x
-        sta _dc_v0
+        asl
+        tay
+        lda _dc_scx,y
+        sta line_x0
+        lda _dc_scx+1,y
+        sta line_x0+1
+        ldx _dc_eidx
+        lda _dc_e0,x
+        tax
+        lda _dc_scy,x
+        sta line_y0
+
+        ldx _dc_eidx
         lda _dc_e1,x
-        sta _dc_v1
-
-        lda _dc_use_old
-        bne _dc_de_old
-
-        ; Current coords
-        lda _dc_v0
-        asl
-        tay
-        lda _dc_scx,y
-        sta line_x0
-        lda _dc_scx+1,y
-        sta line_x0+1
-        ldx _dc_v0
-        lda _dc_scy,x
-        sta line_y0
-        lda _dc_v1
         asl
         tay
         lda _dc_scx,y
         sta line_x1
         lda _dc_scx+1,y
         sta line_x1+1
-        ldx _dc_v1
+        ldx _dc_eidx
+        lda _dc_e1,x
+        tax
         lda _dc_scy,x
         sta line_y1
-        jmp _dc_de_go
 
-_dc_de_old:
-        lda _dc_v0
-        asl
-        tay
-        lda _dc_ocx,y
-        sta line_x0
-        lda _dc_ocx+1,y
-        sta line_x0+1
-        ldx _dc_v0
-        lda _dc_ocy,x
-        sta line_y0
-        lda _dc_v1
-        asl
-        tay
-        lda _dc_ocx,y
-        sta line_x1
-        lda _dc_ocx+1,y
-        sta line_x1+1
-        ldx _dc_v1
-        lda _dc_ocy,x
-        sta line_y1
-
-_dc_de_go:
-        lda _dc_lcol
+        lda #$0D                ; light green
         sta line_col
         jsr draw_line
         ldx _dc_eidx
@@ -192,11 +131,7 @@ _dc_de_go:
         bne _dc_de_lp
         rts
 
-_dc_lcol:    .byte 0
-_dc_use_old: .byte 0
 _dc_eidx:    .byte 0
-_dc_v0:      .byte 0
-_dc_v1:      .byte 0
 
 ;=======================================================================================
 ; _dc_xform - Rotate and project all vertices
