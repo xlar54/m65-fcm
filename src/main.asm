@@ -74,6 +74,7 @@ main:
         jsr demo_floodfill
         jsr demo_abstract
         jsr demo_lines
+        jsr demo_cube
         jsr demo_colorwheel
         jsr demo_solar
 
@@ -121,6 +122,7 @@ WAIT_SPACEBAR:
 .include "demo_floodfill.asm"
 .include "demo_lines.asm"
 .include "demo_abstract.asm"
+.include "demo_cube.asm"
 .include "demo_colorwheel.asm"
 .include "demo_solar.asm"
 
