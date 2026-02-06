@@ -9,6 +9,15 @@
 ;               CIRC=diagonal TL-BR (angle 32), ELIP=diagonal TR-BL (angle 224)
 ;=======================================================================================
 
+SET_PALETTE_CLR      .macro index, r,g,b
+        lda #\index
+        ldx #\r
+        ldy #\g
+        ldz #\b
+        jsr set_palette_color
+.endmacro
+
+
 ;=======================================================================================
 ; demo40 - Main entry point
 ;=======================================================================================
@@ -46,35 +55,40 @@ demo40:
         ;===================================================================
         ; Outline shape colors
         ;===================================================================
-        lda #$10
-        ldx #$0F
-        ldy #$02
-        ldz #$02
-        jsr set_palette_color   ; red (square)
+        #SET_PALETTE_CLR $10, $0F, $02, $02
+        ;lda #$10
+        ;ldx #$0F
+        ;ldy #$02
+        ;ldz #$02
+        ;jsr set_palette_color   ; red (square)
 
-        lda #$11
-        ldx #$02
-        ldy #$0D
-        ldz #$02
-        jsr set_palette_color   ; green (rectangle)
+        #SET_PALETTE_CLR $11, $02, $0D, $02
+        ;lda #$11
+        ;ldx #$02
+        ;ldy #$0D
+        ;ldz #$02
+        ;jsr set_palette_color   ; green (rectangle)
 
-        lda #$12
-        ldx #$02
-        ldy #$04
-        ldz #$0F
-        jsr set_palette_color   ; blue (pentagon)
+        #SET_PALETTE_CLR $12, $02, $04, $0F
+        ;lda #$12
+        ;ldx #$02
+        ;ldy #$04
+        ;ldz #$0F
+        ;jsr set_palette_color   ; blue (pentagon)
 
-        lda #$13
-        ldx #$0E
-        ldy #$0D
-        ldz #$01
-        jsr set_palette_color   ; yellow (triangle)
+        #SET_PALETTE_CLR $13, $0E, $0D, $01
+        ;lda #$13
+        ;ldx #$0E
+        ;ldy #$0D
+        ;ldz #$01
+        ;jsr set_palette_color   ; yellow (triangle)
 
-        lda #$14
-        ldx #$01
-        ldy #$0C
-        ldz #$0E
-        jsr set_palette_color   ; cyan (circle)
+        #SET_PALETTE_CLR $14, $01, $0C, $0E
+        ;lda #$14
+        ;ldx #$01
+        ;ldy #$0C
+        ;ldz #$0E
+        ;jsr set_palette_color   ; cyan (circle)
 
         lda #$15
         ldx #$0D
@@ -153,6 +167,8 @@ demo40:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #218             ; Flat left edge: 128 + (256/(sides*2)) = 102
+        sta poly_angle       ; For a flat bottom edge, rotate 90° more (or 64 in a 0-255 system) = 102+64
         clc
         jsr draw_polygon
 
@@ -171,6 +187,8 @@ demo40:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #149          ; Flat left edge: 128 + (256/(sides*2)) = 42
+        sta poly_angle  ; For a flat bottom edge, rotate 90° more (or 64 in this 0-255 system) = 42+64
         clc
         jsr draw_polygon
 
@@ -388,6 +406,8 @@ demo40:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #217
+        sta poly_angle
         sec
         jsr draw_polygon
 
@@ -433,6 +453,8 @@ demo40:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #149
+        sta poly_angle
         sec
         jsr draw_polygon
 
@@ -676,8 +698,73 @@ demo40:
         ;===================================================================
         ; Wait for spacebar
         ;===================================================================
-        jsr WAIT_SPACEBAR
+        ;jsr WAIT_SPACEBAR
+
+;--- 4. Spinning Triangle at (192, 57) r=22 ---
+        lda #149
+        sta _spin_angle         ; Start at angle 0
+
+_spin_loop:
+        ; Erase previous triangle (draw in background color)
+        lda #<192
+        sta poly_cx
+        lda #>192
+        sta poly_cx+1
+        lda #57
+        sta poly_cy
+        lda #22
+        sta poly_r
+        lda #3
+        sta poly_sides
+        lda #$01                ; Background color (erase)
+        sta poly_col
+        lda #0
+        sta poly_grad
+        lda _spin_angle
+        sta poly_angle
+        clc
+        jsr draw_polygon
+
+        ; Increment angle for next frame
+        lda _spin_angle
+        clc
+        adc #2                  ; Rotation speed (2 = slow, 4 = medium, 8 = fast)
+        sta _spin_angle
+
+        ; Draw triangle at new angle (in yellow)
+        lda #<192
+        sta poly_cx
+        lda #>192
+        sta poly_cx+1
+        lda #57
+        sta poly_cy
+        lda #22
+        sta poly_r
+        lda #3
+        sta poly_sides
+        lda #$13                ; Yellow
+        sta poly_col
+        lda #0
+        sta poly_grad
+        lda _spin_angle
+        sta poly_angle
+        clc
+        jsr draw_polygon
+
+        ; Check for spacebar
+        jsr $FFE4               ; GETIN
+        cmp #' '
+        beq _spin_done          ; Exit if spacebar pressed
+        cmp #0
+        beq _spin_loop          ; No key pressed, continue spinning
+        jmp _spin_loop          ; Other key pressed, ignore and continue
+
+_spin_done:
+        ; Optionally redraw final triangle in original position
+        ; (or leave it wherever it stopped)
+
         rts
+_spin_angle: .byte 0
 
 ;---------------------------------------------------------------------------------------
 ; Label strings

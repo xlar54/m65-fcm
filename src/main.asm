@@ -74,8 +74,6 @@ main:
         jsr demo_colorwheel
         jsr demo_solar
 
-        jsr WAIT_SPACEBAR
-
         lda #MODE_BASIC         ; Return to BASIC mode
         jsr set_screen_mode
         rts

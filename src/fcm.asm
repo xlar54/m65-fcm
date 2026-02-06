@@ -252,6 +252,34 @@ _ssm_screen_off:
         rts
 
 ;---------------------------------------------------------------------------------------
+; reset_palette - Restore default C64/MEGA65 16-color palette
+;---------------------------------------------------------------------------------------
+_ssm_reset_palette:
+        ldx #0
+_ssm_rp_loop:
+        lda _ssm_rp_defaults,x
+        sta $D100,x             ; Red
+        lda _ssm_rp_defaults+16,x
+        sta $D200,x             ; Green  
+        lda _ssm_rp_defaults+32,x
+        sta $D300,x             ; Blue
+        inx
+        cpx #16
+        bne _ssm_rp_loop
+        rts
+
+_ssm_rp_defaults:
+        ; Red channel
+        .byte $00,$0F,$0F,$00,$0F,$00,$00,$0F
+        .byte $0F,$0A,$0F,$05,$08,$09,$09,$0B
+        ; Green channel
+        .byte $00,$0F,$00,$0F,$00,$0F,$00,$0F
+        .byte $06,$04,$07,$05,$08,$0F,$09,$0B
+        ; Blue channel
+        .byte $00,$0F,$00,$0F,$0F,$00,$0F,$00
+        .byte $00,$00,$07,$05,$08,$09,$0F,$0B
+
+;---------------------------------------------------------------------------------------
 ; Exit to BASIC mode
 ;---------------------------------------------------------------------------------------
 _ssm_exit_basic:
@@ -314,11 +342,6 @@ _ssm_exit_basic:
         lda #$68
         sta VIC4_TEXTYPOS
 
-        ; Restore default colors
-        lda #$06
-        sta BORDERCOL
-        sta BACKCOL
-
         ; DMA: Reset color RAM
         lda #$00
         sta $D707
@@ -334,9 +357,17 @@ _ssm_exit_basic:
         .byte $00
         .word $0000
 
+        ; Restore palette
+        jsr _ssm_reset_palette
+
         ; CINT + clear screen
         jsr $FF81
         jsr $FF84
+
+        ; Restore default colors
+        lda #$06
+        sta BORDERCOL
+        sta BACKCOL
 
         rts
 

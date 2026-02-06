@@ -13,6 +13,7 @@ poly_r:     .byte 0
 poly_col:   .byte 0
 poly_sides: .byte 0
 poly_grad:  .byte 0             ; 0=flat, nonzero=gradient
+poly_angle: .byte 0   ; 0-255, where 0=up, 64=right, 128=down, 192=left
 
 draw_polygon:
         ; Save fill flag from carry FIRST
@@ -55,7 +56,7 @@ _pg_vert_loop:
         jsr _pg_div16x8
         lda _pg_div_num
         sec
-        sbc #64
+        sbc poly_angle
         sta _pg_cur_angle
 
         ; X offset: r * cos(angle)

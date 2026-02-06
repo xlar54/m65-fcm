@@ -157,6 +157,8 @@ demo80:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #218
+        sta poly_angle
         clc
         jsr draw_polygon
 
@@ -175,6 +177,8 @@ demo80:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #149
+        sta poly_angle
         clc
         jsr draw_polygon
 
@@ -392,6 +396,8 @@ demo80:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #218
+        sta poly_angle
         sec
         jsr draw_polygon
 
@@ -437,6 +443,8 @@ demo80:
         sta poly_col
         lda #0
         sta poly_grad
+        lda #149
+        sta poly_angle
         sec
         jsr draw_polygon
 
