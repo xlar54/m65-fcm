@@ -195,6 +195,16 @@ _ccr_pos_counts:  .word 1000, 2750     ; positions: 40-col, 80-col
 ;=======================================================================================
 ; plot_pixel - Draw a pixel at x,y with color
 ; Input:  plot_x (16-bit), plot_y (8-bit), plot_col (8-bit)
+;
+; Uses MEGA65 hardware multiplier at $D770-$D77F for fast address calculation.
+;
+; Address = CHAR_DATA + (char_row * columns + char_col) * 64 + pixel_y * 8 + pixel_x
+;
+; Where: char_col = x / 8,  char_row = y / 8
+;        pixel_x  = x & 7,  pixel_y  = y & 7
+;        columns  = 40 (or 80)
+;
+; Optimization: use hardware multiply for (char_row * columns) and (char_index * 64)
 ;=======================================================================================
 plot_x:     .word 0
 plot_y:     .byte 0
@@ -230,112 +240,66 @@ plot_pixel:
         lda plot_y
         and #$07
         sta _pp_pixel_y
-        
-        ; char_index = char_row × columns + char_col
-        ; Start with char_row × 8
+
+        ; --- Hardware multiply: char_row * columns ---
+        ; MULTINA = char_row (32-bit, only low byte used)
         lda _pp_char_row
-        sta _pp_tmp
+        sta $D770           ; MULTINA byte 0
         lda #0
-        sta _pp_tmp+1
-        
-        asl _pp_tmp
-        rol _pp_tmp+1
-        asl _pp_tmp
-        rol _pp_tmp+1
-        asl _pp_tmp
-        rol _pp_tmp+1           ; × 8
-        
-        lda _pp_tmp
-        sta _pp_tmp2
-        lda _pp_tmp+1
-        sta _pp_tmp2+1          ; Save × 8
-        
-        asl _pp_tmp
-        rol _pp_tmp+1           ; × 16
-        
-        lda screen_mode
-        cmp #80
-        beq _pp_80col
-        
-        ; 40-col: × 40 = × 32 + × 8
-        asl _pp_tmp
-        rol _pp_tmp+1           ; × 32
-        jmp _pp_add_base
-        
-_pp_80col:
-        ; 80-col: × 80 = × 64 + × 16
-        lda _pp_tmp
-        sta _pp_tmp2
-        lda _pp_tmp+1
-        sta _pp_tmp2+1          ; Save × 16
-        
-        asl _pp_tmp
-        rol _pp_tmp+1
-        asl _pp_tmp
-        rol _pp_tmp+1           ; × 64
+        sta $D771           ; MULTINA byte 1
+        sta $D772           ; MULTINA byte 2
+        sta $D773           ; MULTINA byte 3
 
-_pp_add_base:
-        ; Add saved value (× 8 for 40-col, × 16 for 80-col)
-        clc
-        lda _pp_tmp
-        adc _pp_tmp2
-        sta _pp_tmp
-        lda _pp_tmp+1
-        adc _pp_tmp2+1
-        sta _pp_tmp+1
+        ; MULTINB = columns (40 or 80)
+        lda screen_mode     ; 40 or 80
+        sta $D774           ; MULTINB byte 0
+        lda #0
+        sta $D775           ; MULTINB byte 1
+        sta $D776           ; MULTINB byte 2
+        sta $D777           ; MULTINB byte 3
 
-        ; Add char_col
+        ; Result available in 1 cycle - read MULTOUT (only need low 16 bits)
+        ; char_index = MULTOUT + char_col
         clc
-        lda _pp_tmp
+        lda $D778           ; MULTOUT byte 0
         adc _pp_char_col
         sta _pp_char_idx
-        lda _pp_tmp+1
+        lda $D779           ; MULTOUT byte 1
         adc _pp_char_col+1
         sta _pp_char_idx+1
-        
-        ; char_base = CHAR_DATA + char_index × 64
+
+        ; --- Hardware multiply: char_index * 64 ---
         lda _pp_char_idx
-        sta _pp_tmp
+        sta $D770           ; MULTINA byte 0
         lda _pp_char_idx+1
-        sta _pp_tmp+1
+        sta $D771           ; MULTINA byte 1
         lda #0
-        sta _pp_tmp+2
-        
-        ; × 64
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        asl _pp_tmp
-        rol _pp_tmp+1
-        rol _pp_tmp+2
-        
-        ; Add CHAR_DATA base
+        sta $D772
+        sta $D773
+
+        lda #64
+        sta $D774           ; MULTINB byte 0
+        lda #0
+        sta $D775
+        sta $D776
+        sta $D777
+
+        ; Result = 24-bit address offset, read MULTOUT
+        ; char_base = CHAR_DATA + MULTOUT
         clc
-        lda _pp_tmp
+        lda $D778           ; MULTOUT byte 0
         adc #<CHAR_DATA
         sta PTR
-        lda _pp_tmp+1
+        lda $D779           ; MULTOUT byte 1
         adc #>CHAR_DATA
         sta PTR+1
-        lda _pp_tmp+2
+        lda $D77A           ; MULTOUT byte 2
         adc #`CHAR_DATA
         sta PTR+2
         lda #0
         sta PTR+3
         
-        ; pixel_offset = pixel_y × 8 + pixel_x
+        ; pixel_offset = pixel_y * 8 + pixel_x
         lda _pp_pixel_y
         asl
         asl
@@ -357,6 +321,110 @@ _pp_pixel_y:    .byte 0
 _pp_char_idx:   .word 0
 _pp_tmp:        .byte 0, 0, 0
 _pp_tmp2:       .word 0
+
+
+;=======================================================================================
+; get_pixel - Read pixel color at x,y
+; Input:  plot_x (16-bit), plot_y (8-bit)
+; Output: A = color
+;
+; Uses hardware multiplier for fast address calculation.
+;=======================================================================================
+get_pixel:
+        lda plot_x
+        sta _gp_char_col
+        lda plot_x+1
+        sta _gp_char_col+1
+        
+        lsr _gp_char_col+1
+        ror _gp_char_col
+        lsr _gp_char_col+1
+        ror _gp_char_col
+        lsr _gp_char_col+1
+        ror _gp_char_col
+        
+        lda plot_y
+        lsr
+        lsr
+        lsr
+        sta _gp_char_row
+        
+        lda plot_x
+        and #$07
+        sta _gp_pixel_x
+        
+        lda plot_y
+        and #$07
+        sta _gp_pixel_y
+
+        ; Hardware multiply: char_row * columns
+        lda _gp_char_row
+        sta $D770
+        lda #0
+        sta $D771
+        sta $D772
+        sta $D773
+        lda screen_mode
+        sta $D774
+        lda #0
+        sta $D775
+        sta $D776
+        sta $D777
+
+        clc
+        lda $D778
+        adc _gp_char_col
+        sta _gp_char_idx
+        lda $D779
+        adc _gp_char_col+1
+        sta _gp_char_idx+1
+
+        ; Hardware multiply: char_index * 64
+        lda _gp_char_idx
+        sta $D770
+        lda _gp_char_idx+1
+        sta $D771
+        lda #0
+        sta $D772
+        sta $D773
+        lda #64
+        sta $D774
+        lda #0
+        sta $D775
+        sta $D776
+        sta $D777
+
+        clc
+        lda $D778
+        adc #<CHAR_DATA
+        sta PTR
+        lda $D779
+        adc #>CHAR_DATA
+        sta PTR+1
+        lda $D77A
+        adc #`CHAR_DATA
+        sta PTR+2
+        lda #0
+        sta PTR+3
+        
+        lda _gp_pixel_y
+        asl
+        asl
+        asl
+        clc
+        adc _gp_pixel_x
+        taz
+        
+        lda [PTR],z
+        rts
+
+_gp_char_col:   .word 0
+_gp_char_row:   .byte 0
+_gp_pixel_x:    .byte 0
+_gp_pixel_y:    .byte 0
+_gp_char_idx:   .word 0
+_gp_tmp:        .byte 0, 0, 0
+_gp_tmp2:       .word 0
 
 
 ;=======================================================================================

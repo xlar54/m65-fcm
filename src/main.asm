@@ -71,6 +71,9 @@ main:
         jsr demo_text80
         jsr demo40
         jsr demo80
+        jsr demo_floodfill
+        jsr demo_abstract
+        jsr demo_lines
         jsr demo_colorwheel
         jsr demo_solar
 
@@ -108,14 +111,19 @@ WAIT_SPACEBAR:
 .include "circle.asm"
 .include "ellipse.asm"
 .include "polygon.asm"
+.include "floodfill.asm"
 
 ; demos
 .include "demo_text_40.asm"
 .include "demo_text_80.asm"
 .include "demo_bitmap_320x200.asm"
 .include "demo_bitmap_640x200.asm"
+.include "demo_floodfill.asm"
+.include "demo_lines.asm"
+.include "demo_abstract.asm"
 .include "demo_colorwheel.asm"
 .include "demo_solar.asm"
+
 
 
 
