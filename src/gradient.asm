@@ -23,13 +23,6 @@
 ; PERFORMANCE IMPROVEMENT: ~5-8x faster than software math version
 ;=======================================================================================
 
-; Hardware math registers
-MULTINA     = $D770     ; Multiplier/Divider input A (32-bit)
-MULTINB     = $D774     ; Multiplier/Divider input B (32-bit)
-MULTOUT     = $D778     ; Multiply output (64-bit)
-DIVOUT      = $D768     ; Divide output (64-bit: frac in 0-3, whole in 4-7)
-DIVBUSY     = $D70F     ; Bit 7 = divider busy flag
-
 grad_r1:    .byte 0
 grad_g1:    .byte 0
 grad_b1:    .byte 0

@@ -466,24 +466,24 @@ _el_mul8x8:
 ;---- hardware accelerated
 _el_mul8x8_hw:
         ; Input: A = multiplicand, X = multiplier
-        sta $D770
+        sta MULTINA
         lda #0
-        sta $D771
-        sta $D772
-        sta $D773
+        sta MULTINA+1
+        sta MULTINA+2
+        sta MULTINA+3
         
-        stx $D774
+        stx MULTINB
         lda #0
-        sta $D775
-        sta $D776
-        sta $D777
+        sta MULTINB+1
+        sta MULTINB+2
+        sta MULTINB+3
         
         ; No wait needed - multiplier is instant!
         ; (MULBUSY never sets according to docs)
         
-        lda $D778               ; Result low byte
+        lda MULTOUT               ; Result low byte
         sta _el_mul_result
-        lda $D779               ; Result high byte
+        lda MULTOUT+1               ; Result high byte
         sta _el_mul_result+1
         rts
 

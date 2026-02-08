@@ -5,12 +5,12 @@ ssm_mode: .byte 0
 
 ;=======================================================================================
 ; set_screen_mode - Initialize screen mode
-; Input: A = mode (0-4, other values treated as 0)
+; Input: A = mode (0-6, other values treated as 0)
 ; Destroys: A, X, Y, Z, PTR
 ;=======================================================================================
 set_screen_mode:
         ; Validate mode
-        cmp #5
+        cmp #7
         bcc _ssm_valid
         lda #0                  ; Invalid mode -> BASIC
 _ssm_valid:
@@ -49,6 +49,10 @@ _ssm_fcm_init:
         beq _ssm_bitmap40
         cmp #MODE_BITMAP80
         beq _ssm_bitmap80
+        cmp #MODE_NCM40
+        beq _ssm_ncm40
+        cmp #MODE_NCM80
+        beq _ssm_ncm80
         jmp restore_default_screen     ; Fallback
 
 ;---------------------------------------------------------------------------------------
@@ -180,6 +184,84 @@ _ssm_bitmap80:
         jmp _ssm_finish_bitmap
 
 ;---------------------------------------------------------------------------------------
+; NCM 40-column mode (320×200, 20 chars wide × 16 pixels)
+;---------------------------------------------------------------------------------------
+_ssm_ncm40:
+        lda #20                 ; NCM 40 uses 20 chars
+        sta screen_mode
+
+        lda VIC3_CTRL
+        and #%01011111          ; Clear H640 AND clear ATTR first
+        sta VIC3_CTRL
+        lda VIC3_CTRL
+        ora #%00100000          ; Now set ATTR
+        sta VIC3_CTRL
+
+        lda #80                 ; LINESTEP = 20 chars x 2 bytes = 40
+        sta VIC4_LINESTPLSB
+        lda #0
+        sta VIC4_LINESTPMSB
+
+        lda #40
+        sta VIC4_CHRCOUNT               ; CHRCOUNT (20 NCM chars)
+
+        lda #25
+        sta VIC4_DISPROWS               ; CHRCOUNT_V - number of rows 
+
+        lda #$50
+        sta VIC4_TEXTXPOS
+        lda #0
+        sta VIC4_TEXTXPOS+1
+        lda #$69
+        sta VIC4_TEXTYPOS
+
+        ; Enable FCLRHI (bit 2) for FCM on screen codes 256+
+        ; NCM characters must be FCM characters with color RAM bit 3 set
+        lda VIC4_CTRL
+        ora #%00000100          ; Set FCLRHI (bit 2)
+        sta VIC4_CTRL
+
+        jmp _ssm_finish_ncm
+
+;---------------------------------------------------------------------------------------
+; NCM 80-column mode (640×200, 40 chars wide × 16 pixels)
+;---------------------------------------------------------------------------------------
+_ssm_ncm80:
+        lda #40                 ; NCM 80 uses 40 chars
+        sta screen_mode
+
+        lda VIC3_CTRL
+        and #%01011111          ; Clear H640 and ATTR first
+        ora #%10100000          ; Then set H640 + ATTR
+        sta VIC3_CTRL
+
+        lda #160                ; LINESTEP = 40 chars x 2 bytes = 80
+        sta VIC4_LINESTPLSB
+        lda #0
+        sta VIC4_LINESTPMSB
+
+        lda #80
+        sta VIC4_CHRCOUNT               ; CHRCOUNT (display 40 NCM chars)
+
+        lda #25
+        sta VIC4_DISPROWS               ; CHRCOUNT_V - number of rows 
+
+        lda #$50
+        sta VIC4_TEXTXPOS
+        lda #0
+        sta VIC4_TEXTXPOS+1
+        lda #$69
+        sta VIC4_TEXTYPOS
+
+        ; Enable FCLRHI (bit 2) for FCM on screen codes 256+
+        ; NCM characters must be FCM characters with color RAM bit 3 set
+        lda VIC4_CTRL
+        ora #%00000100          ; Set FCLRHI (bit 2)
+        sta VIC4_CTRL
+
+        jmp _ssm_finish_ncm
+
+;---------------------------------------------------------------------------------------
 ; Common setup for text modes
 ;---------------------------------------------------------------------------------------
 _ssm_finish_text:
@@ -207,6 +289,23 @@ _ssm_finish_bitmap:
         
         lda #$00
         jsr clear_bitmap
+        
+        jmp _ssm_screen_on
+
+;---------------------------------------------------------------------------------------
+; Common setup for NCM modes
+;---------------------------------------------------------------------------------------
+_ssm_finish_ncm:
+        jsr _ssm_setup_pointers
+
+        ; Clear color RAM with NCM bit set, palette base 0
+        lda #$00                ; Palette base 0 (colors 0-15)
+        jsr clear_color_ram_ncm
+
+        jsr init_ncm
+        
+        lda #$00                ; Clear to color 0
+        jsr clear_ncm
         
         jmp _ssm_screen_on
 

@@ -244,56 +244,56 @@ plot_pixel:
         ; --- Hardware multiply: char_row * columns ---
         ; MULTINA = char_row (32-bit, only low byte used)
         lda _pp_char_row
-        sta $D770           ; MULTINA byte 0
+        sta MULTINA           ; MULTINA byte 0
         lda #0
-        sta $D771           ; MULTINA byte 1
-        sta $D772           ; MULTINA byte 2
-        sta $D773           ; MULTINA byte 3
+        sta MULTINA+1           ; MULTINA byte 1
+        sta MULTINA+2           ; MULTINA byte 2
+        sta MULTINA+3           ; MULTINA byte 3
 
         ; MULTINB = columns (40 or 80)
-        lda screen_mode     ; 40 or 80
-        sta $D774           ; MULTINB byte 0
+        lda screen_mode         ; 40 or 80
+        sta MULTINB             ; MULTINB byte 0
         lda #0
-        sta $D775           ; MULTINB byte 1
-        sta $D776           ; MULTINB byte 2
-        sta $D777           ; MULTINB byte 3
+        sta MULTINB+1           ; MULTINB byte 1
+        sta MULTINB+2           ; MULTINB byte 2
+        sta MULTINB+3           ; MULTINB byte 3
 
         ; Result available in 1 cycle - read MULTOUT (only need low 16 bits)
         ; char_index = MULTOUT + char_col
         clc
-        lda $D778           ; MULTOUT byte 0
+        lda MULTOUT           ; MULTOUT byte 0
         adc _pp_char_col
         sta _pp_char_idx
-        lda $D779           ; MULTOUT byte 1
+        lda MULTOUT+1           ; MULTOUT byte 1
         adc _pp_char_col+1
         sta _pp_char_idx+1
 
         ; --- Hardware multiply: char_index * 64 ---
         lda _pp_char_idx
-        sta $D770           ; MULTINA byte 0
+        sta MULTINA           ; MULTINA byte 0
         lda _pp_char_idx+1
-        sta $D771           ; MULTINA byte 1
+        sta MULTINA+1           ; MULTINA byte 1
         lda #0
-        sta $D772
-        sta $D773
+        sta MULTINA+2
+        sta MULTINA+3
 
         lda #64
-        sta $D774           ; MULTINB byte 0
+        sta MULTINB           ; MULTINB byte 0
         lda #0
-        sta $D775
-        sta $D776
-        sta $D777
+        sta MULTINB+1
+        sta MULTINB+2
+        sta MULTINB+3
 
         ; Result = 24-bit address offset, read MULTOUT
         ; char_base = CHAR_DATA + MULTOUT
         clc
-        lda $D778           ; MULTOUT byte 0
+        lda MULTOUT           ; MULTOUT byte 0
         adc #<CHAR_DATA
         sta PTR
-        lda $D779           ; MULTOUT byte 1
+        lda MULTOUT+1           ; MULTOUT byte 1
         adc #>CHAR_DATA
         sta PTR+1
-        lda $D77A           ; MULTOUT byte 2
+        lda MULTOUT+2           ; MULTOUT byte 2
         adc #`CHAR_DATA
         sta PTR+2
         lda #0
@@ -359,49 +359,49 @@ get_pixel:
 
         ; Hardware multiply: char_row * columns
         lda _gp_char_row
-        sta $D770
+        sta MULTINA
         lda #0
-        sta $D771
-        sta $D772
-        sta $D773
+        sta MULTINA+1
+        sta MULTINA+2
+        sta MULTINA+3
         lda screen_mode
-        sta $D774
+        sta MULTINB
         lda #0
-        sta $D775
-        sta $D776
-        sta $D777
+        sta MULTINB+1
+        sta MULTINB+2
+        sta MULTINB+3
 
         clc
-        lda $D778
+        lda MULTOUT
         adc _gp_char_col
         sta _gp_char_idx
-        lda $D779
+        lda MULTOUT+1
         adc _gp_char_col+1
         sta _gp_char_idx+1
 
         ; Hardware multiply: char_index * 64
         lda _gp_char_idx
-        sta $D770
+        sta MULTINA
         lda _gp_char_idx+1
-        sta $D771
+        sta MULTINA+1
         lda #0
-        sta $D772
-        sta $D773
+        sta MULTINA+2
+        sta MULTINA+3
         lda #64
-        sta $D774
+        sta MULTINB
         lda #0
-        sta $D775
-        sta $D776
-        sta $D777
+        sta MULTINB+1
+        sta MULTINB+2
+        sta MULTINB+3
 
         clc
-        lda $D778
+        lda MULTOUT
         adc #<CHAR_DATA
         sta PTR
-        lda $D779
+        lda MULTOUT+1
         adc #>CHAR_DATA
         sta PTR+1
-        lda $D77A
+        lda MULTOUT+2
         adc #`CHAR_DATA
         sta PTR+2
         lda #0
