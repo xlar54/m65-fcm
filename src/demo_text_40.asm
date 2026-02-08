@@ -5,6 +5,12 @@
 ; 320x200 at 256 colors (FCM)
 ;=========================================================================================
 demo_text40:
+        ; Set background and border
+        lda #$01                ; screen color
+        sta BACKCOL
+        lda #$05                ; border
+        sta BORDERCOL
+
         lda #MODE_TEXT40
         jsr set_screen_mode
 

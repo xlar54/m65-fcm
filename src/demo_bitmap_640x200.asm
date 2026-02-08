@@ -16,7 +16,14 @@
 ;=======================================================================================
 ; demo80 - Main entry point
 ;=======================================================================================
-demo80:
+demo_bitmap_80:
+
+        ; Set background and border
+        lda #$01                ; screen color
+        sta BACKCOL
+        lda #$05                ; border
+        sta BORDERCOL
+
         lda #MODE_BITMAP80
         jsr set_screen_mode
 

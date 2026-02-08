@@ -4,8 +4,12 @@
 ; This code demonstrates using this library to create custom characters that use 
 ; 640x200 at 256 colors (FCM)
 ;=========================================================================================
-
 demo_text80:
+        ; Set background and border
+        lda #$01                ; screen color
+        sta BACKCOL
+        lda #$05                ; border
+        sta BORDERCOL
 
         lda #MODE_TEXT80
         jsr set_screen_mode

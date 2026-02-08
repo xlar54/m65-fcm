@@ -50,33 +50,39 @@ MODE_BITMAP80   = 4
 
         * = $2012
 
-        jmp main
-
-screen_mode:
-        .byte 80        ; 40 or 80 col
-
-
 ;=======================================================================================
 ; main entry
 ;=======================================================================================
 main:
-
-        ; Set background and border
-        lda #$01                ; screen color
-        sta BACKCOL
-        lda #$05                ; border
-        sta BORDERCOL
-
         jsr demo_text40
+        jsr restore_default_screen
+
         jsr demo_text80
-        jsr demo40
-        jsr demo80
+        jsr restore_default_screen
+
+        jsr demo_bitmap_40
+        jsr restore_default_screen
+
+        jsr demo_bitmap_80 
+        jsr restore_default_screen
+
         jsr demo_floodfill
+        jsr restore_default_screen
+
         jsr demo_abstract
+        jsr restore_default_screen
+
         jsr demo_lines
+        jsr restore_default_screen
+
         jsr demo_cube
+        jsr restore_default_screen
+
         jsr demo_colorwheel
+        jsr restore_default_screen
+
         jsr demo_solar
+        jsr restore_default_screen
 
         lda #MODE_BASIC         ; Return to BASIC mode
         jsr set_screen_mode

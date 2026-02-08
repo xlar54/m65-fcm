@@ -1,3 +1,8 @@
+screen_mode:
+        .byte $00        ; 40 or 80 col
+
+ssm_mode: .byte 0
+
 ;=======================================================================================
 ; set_screen_mode - Initialize screen mode
 ; Input: A = mode (0-4, other values treated as 0)
@@ -9,12 +14,12 @@ set_screen_mode:
         bcc _ssm_valid
         lda #0                  ; Invalid mode -> BASIC
 _ssm_valid:
-        sta _ssm_mode
+        sta ssm_mode
         
         ; Mode 0 = exit to BASIC
         cmp #0
         bne _ssm_fcm_init
-        jmp _ssm_exit_basic
+        jmp restore_default_screen
 
 _ssm_fcm_init:
         ; Enable MEGA65 VIC-IV registers
@@ -35,7 +40,7 @@ _ssm_fcm_init:
         jsr _ssm_screen_off
 
         ; Branch based on mode
-        lda _ssm_mode
+        lda ssm_mode
         cmp #MODE_TEXT40
         beq _ssm_text40
         cmp #MODE_TEXT80
@@ -44,7 +49,7 @@ _ssm_fcm_init:
         beq _ssm_bitmap40
         cmp #MODE_BITMAP80
         beq _ssm_bitmap80
-        jmp _ssm_exit_basic     ; Fallback
+        jmp restore_default_screen     ; Fallback
 
 ;---------------------------------------------------------------------------------------
 ; Text 40-column mode
@@ -252,37 +257,9 @@ _ssm_screen_off:
         rts
 
 ;---------------------------------------------------------------------------------------
-; reset_palette - Restore default C64/MEGA65 16-color palette
+; restore_default_screen - switching modes or returning to BASIC
 ;---------------------------------------------------------------------------------------
-_ssm_reset_palette:
-        ldx #0
-_ssm_rp_loop:
-        lda _ssm_rp_defaults,x
-        sta $D100,x             ; Red
-        lda _ssm_rp_defaults+16,x
-        sta $D200,x             ; Green  
-        lda _ssm_rp_defaults+32,x
-        sta $D300,x             ; Blue
-        inx
-        cpx #16
-        bne _ssm_rp_loop
-        rts
-
-_ssm_rp_defaults:
-        ; Red channel
-        .byte $00,$0F,$0F,$00,$0F,$00,$00,$0F
-        .byte $0F,$0A,$0F,$05,$08,$09,$09,$0B
-        ; Green channel
-        .byte $00,$0F,$00,$0F,$00,$0F,$00,$0F
-        .byte $06,$04,$07,$05,$08,$0F,$09,$0B
-        ; Blue channel
-        .byte $00,$0F,$00,$0F,$0F,$00,$0F,$00
-        .byte $00,$00,$07,$05,$08,$09,$0F,$0B
-
-;---------------------------------------------------------------------------------------
-; Exit to BASIC mode
-;---------------------------------------------------------------------------------------
-_ssm_exit_basic:
+restore_default_screen:
         ; Enable VIC-IV
         lda #$47
         sta VIC4_KEY
@@ -358,7 +335,7 @@ _ssm_exit_basic:
         .word $0000
 
         ; Restore palette
-        jsr _ssm_reset_palette
+        jsr restore_default_palette
 
         ; CINT + clear screen
         jsr $FF81
@@ -370,8 +347,6 @@ _ssm_exit_basic:
         sta BACKCOL
 
         rts
-
-_ssm_mode: .byte 0
 
 ;===========================================================================================
 ; sets the palette of colors
@@ -395,6 +370,34 @@ init_palette:
         sta $D300+$AA           ; $AA in char data for RED is set to $00
 
         rts
+
+;---------------------------------------------------------------------------------------
+; restore_default_palette - Restore default C64/MEGA65 16-color palette
+;---------------------------------------------------------------------------------------
+restore_default_palette:
+        ldx #0
+_ssm_rp_loop:
+        lda _ssm_rp_defaults,x
+        sta $D100,x             ; Red
+        lda _ssm_rp_defaults+16,x
+        sta $D200,x             ; Green  
+        lda _ssm_rp_defaults+32,x
+        sta $D300,x             ; Blue
+        inx
+        cpx #16
+        bne _ssm_rp_loop
+        rts
+
+_ssm_rp_defaults:
+        ; Red channel
+        .byte $00,$0F,$0F,$00,$0F,$00,$00,$0F
+        .byte $0F,$0A,$0F,$05,$08,$09,$09,$0B
+        ; Green channel
+        .byte $00,$0F,$00,$0F,$00,$0F,$00,$0F
+        .byte $06,$04,$07,$05,$08,$0F,$09,$0B
+        ; Blue channel
+        .byte $00,$0F,$00,$0F,$0F,$00,$0F,$00
+        .byte $00,$00,$07,$05,$08,$09,$0F,$0B
 
 ;=======================================================================================
 ; set_palette_color - Set a single palette entry to an RGB color
@@ -424,3 +427,4 @@ _spc_idx: .byte 0
 _spc_r:   .byte 0
 _spc_g:   .byte 0
 _spc_b:   .byte 0
+

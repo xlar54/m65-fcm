@@ -8,6 +8,12 @@ msg_solar:
         .text "MEGA65 FCM Solar System",$00
 
 demo_solar:
+        ; Set background and border
+        lda #$00                ; screen color
+        sta BACKCOL
+        lda #$00                ; border
+        sta BORDERCOL
+
         lda #MODE_BITMAP80
         jsr set_screen_mode
 

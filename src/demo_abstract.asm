@@ -4,7 +4,7 @@
 ;=======================================================================================
 
 demo_abstract:
-lda #MODE_BITMAP40
+        lda #MODE_BITMAP40
         jsr set_screen_mode
 
         ; Set background to black

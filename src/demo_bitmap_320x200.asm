@@ -21,7 +21,14 @@ SET_PALETTE_CLR      .macro index, r,g,b
 ;=======================================================================================
 ; demo40 - Main entry point
 ;=======================================================================================
-demo40:
+demo_bitmap_40:
+
+        ; Set background and border
+        lda #$01                ; screen color
+        sta BACKCOL
+        lda #$05                ; border
+        sta BORDERCOL
+
         lda #MODE_BITMAP40
         jsr set_screen_mode
 
