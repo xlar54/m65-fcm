@@ -11,9 +11,12 @@ BORDERCOL               = $D020
 BACKCOL                 = $D021
 VIC4_KEY                = $D02F
 VIC3_CTRL               = $D031
+VIC_TBDRPOS             = $D048 ;  (top border)
+VIC_BBDRPOS             = $D049 ;  (bottom border)
 VIC4_CTRL               = $D054
 VIC4_LINESTPLSB         = $D058
 VIC4_LINESTPMSB         = $D059
+VIC_SDBDRWD             = $D05C ; (side border width)
 VIC4_SCRNPTRLSB         = $D060
 VIC4_SCRNPTRMSB         = $D061
 VIC4_SCRBPTRBNK         = $D062
@@ -83,6 +86,9 @@ main:
         jsr demo_ncm_40
         jsr restore_default_screen
 
+        jsr demo_ncm_40_scroll
+        jsr restore_default_screen
+
         ;jsr demo_ncm_80
         ;jsr restore_default_screen
 
@@ -147,6 +153,7 @@ WAIT_SPACEBAR:
 ; Core libraries (required)
 .include "fcm.asm" 
 .include "ncm.asm"
+.include "ncm_scroll.asm"
 .include "text.asm"
 .include "bitmap.asm"
 .include "gradient.asm"
@@ -165,6 +172,7 @@ WAIT_SPACEBAR:
 .include "demos/demo_bitmap_320x200.asm"
 .include "demos/demo_bitmap_640x200.asm"
 .include "demos/demo_ncm_40.asm"
+.include "demos/demo_ncm_40_scroll.asm"
 .include "demos/demo_ncm_80.asm"
 .include "demos/demo_floodfill.asm"
 .include "demos/demo_lines.asm"

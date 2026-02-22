@@ -216,9 +216,10 @@ _ssm_ncm40:
         sta VIC4_TEXTYPOS
 
         ; Enable FCLRHI (bit 2) for FCM on screen codes 256+
+        ; Enable CHR16 (bit 0) for 16-pixel wide characters
         ; NCM characters must be FCM characters with color RAM bit 3 set
         lda VIC4_CTRL
-        ora #%00000100          ; Set FCLRHI (bit 2)
+        ora #%00000101          ; Set FCLRHI (bit 2) + CHR16 (bit 0)
         sta VIC4_CTRL
 
         jmp _ssm_finish_ncm
@@ -254,9 +255,10 @@ _ssm_ncm80:
         sta VIC4_TEXTYPOS
 
         ; Enable FCLRHI (bit 2) for FCM on screen codes 256+
+        ; Enable CHR16 (bit 0) for 16-pixel wide characters
         ; NCM characters must be FCM characters with color RAM bit 3 set
         lda VIC4_CTRL
-        ora #%00000100          ; Set FCLRHI (bit 2)
+        ora #%00000101          ; Set FCLRHI (bit 2) + CHR16 (bit 0)
         sta VIC4_CTRL
 
         jmp _ssm_finish_ncm
@@ -526,4 +528,3 @@ _spc_idx: .byte 0
 _spc_r:   .byte 0
 _spc_g:   .byte 0
 _spc_b:   .byte 0
-
